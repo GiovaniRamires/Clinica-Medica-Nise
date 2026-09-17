@@ -23,13 +23,13 @@ public class MedicoController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Medico>> listaMedicos (){
-        var medicos = medicoService.listaMedicos();
+    public ResponseEntity<List<Medico>> listarMedicos (){
+        var medicos = medicoService.listarMedicos();
         return ResponseEntity.status(HttpStatus.OK).body(medicos);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Medico> buscarPorID (@PathVariable Long id){
+    public ResponseEntity<Medico> buscarPorId (@PathVariable Long id){
         var medico = medicoService.buscarMedicoPorId(id);
         return ResponseEntity.status(HttpStatus.OK).body(medico);
     }

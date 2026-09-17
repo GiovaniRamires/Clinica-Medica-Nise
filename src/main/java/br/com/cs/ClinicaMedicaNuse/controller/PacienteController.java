@@ -17,19 +17,19 @@ public class PacienteController {
         this.pacienteService = pacienteService;
     }
     @PostMapping ("/criar")
-    public ResponseEntity<Paciente> criar (@Valid @RequestBody Paciente paciente){
+    public ResponseEntity<Paciente> criarPaciente (@Valid @RequestBody Paciente paciente){
         var pacienteNovo = pacienteService.criar(paciente.getNome(), paciente.getCpf(), paciente.getConvenio(), paciente.getAlergias(), paciente.getProntuario());
         return ResponseEntity.status(HttpStatus.CREATED).body(pacienteNovo);
     }
     @GetMapping
-    public ResponseEntity<List<Paciente>> listarPaciente(){
+    public ResponseEntity<List<Paciente>> listarPacientes(){
         var pacientes = pacienteService.listarPacientes();
         return ResponseEntity.status(HttpStatus.OK).body(pacientes);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Paciente> acharPorId(@PathVariable Long id){
-        var paciente = pacienteService.encontrarPacientePorId(id);
+    public ResponseEntity<Paciente> buscarPorId(@PathVariable Long id){
+        var paciente = pacienteService.buscarPacientePorId(id);
         return ResponseEntity.status(HttpStatus.OK).body(paciente);
     }
 
@@ -39,8 +39,8 @@ public class PacienteController {
         return ResponseEntity.status(HttpStatus.OK).body(paciente);
     }
     @DeleteMapping ("/{id}")
-    public ResponseEntity<Void> delete (@PathVariable Long id){
-        pacienteService.delete(id);
+    public ResponseEntity<Void> deletar (@PathVariable Long id){
+        pacienteService.deletar(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
