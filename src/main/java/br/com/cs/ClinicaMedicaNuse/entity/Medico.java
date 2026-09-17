@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table (name = "Medico")
+@Table (name = "medico")
 @Data
 @NoArgsConstructor
 public class Medico {
@@ -18,13 +18,12 @@ public class Medico {
     @NotBlank
     private String nome;
 
-    @NotBlank
     @Column
-
+    @NotBlank
     private String crm;
 
-    @NotBlank
     @Column
+    @NotBlank
     private String especialidade;
 
     public Medico(String nome, String crm, String especialidade) {
