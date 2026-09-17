@@ -10,13 +10,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/paciente")
+@RequestMapping("/pacientes")
 public class PacienteController {
     private final PacienteService pacienteService;
     public PacienteController (PacienteService pacienteService){
         this.pacienteService = pacienteService;
     }
-    @PostMapping ("/criar")
+    @PostMapping
     public ResponseEntity<Paciente> criarPaciente (@Valid @RequestBody Paciente paciente){
         var pacienteNovo = pacienteService.criar(paciente.getNome(), paciente.getCpf(), paciente.getConvenio(), paciente.getAlergias(), paciente.getProntuario());
         return ResponseEntity.status(HttpStatus.CREATED).body(pacienteNovo);
