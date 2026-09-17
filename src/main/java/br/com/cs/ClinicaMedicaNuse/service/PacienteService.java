@@ -24,12 +24,14 @@ public class PacienteService {
         return pacienteRepository.findAll();
     }
 
-    public Paciente encontrarPacientePorId (Long id){
-        return pacienteRepository.findById(id).orElseThrow(() -> new RuntimeException("Paciente não encontrado"));
+    public Paciente buscarPacientePorId(Long id){
+        return pacienteRepository.findById(id).orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.NOT_FOUND,
+                "Médico id: " + id + " não encontrado"));
     }
 
     public Paciente atualizar (Long id, String nome, String cpf, String convenio, String alergias, String prontuario){
-        var paciente = encontrarPacientePorId(id);
+        var paciente = buscarPacientePorId(id);
         paciente.setNome(nome);
         paciente.setCpf(cpf);
         paciente.setConvenio(convenio);
@@ -38,12 +40,8 @@ public class PacienteService {
         return pacienteRepository.save(paciente);
     }
 
-    public void delete (Long id){
-        var paciente = encontrarPacientePorId(id);
+    public void deletar(Long id){
+        var paciente = buscarPacientePorId(id);
         pacienteRepository.delete(paciente);
     }
-
-
-
-
 }
