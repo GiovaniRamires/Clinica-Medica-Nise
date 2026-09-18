@@ -2,7 +2,9 @@ package br.com.cs.ClinicaMedicaNuse.service;
 
 import br.com.cs.ClinicaMedicaNuse.entity.Paciente;
 import br.com.cs.ClinicaMedicaNuse.repository.PacienteRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -25,7 +27,7 @@ public class PacienteService {
     }
 
     public Paciente encontrarPacientePorId (Long id){
-        return pacienteRepository.findById(id).orElseThrow(() -> new RuntimeException("Paciente não encontrado"));
+        return pacienteRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Paciente não encontrado"));
     }
 
     public Paciente atualizar (Long id, String nome, String cpf, String convenio, String alergias, String prontuario){
