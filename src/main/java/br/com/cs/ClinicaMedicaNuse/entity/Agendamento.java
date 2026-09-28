@@ -12,6 +12,12 @@
     @Data
     @NoArgsConstructor
     public class Agendamento {
+        public enum SituacaoAgendamento {
+            AGENDADO,
+            CONFIRMADO,
+            REALIZADO,
+            AUSENTE
+        }
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         private Long id;
