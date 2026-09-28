@@ -1,14 +1,348 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clinica Médica</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clínica Médica Nise</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Lista de Pacientes</h1>
-    <ul>"Lista de Pacientes"</ul>
 
-    <script src="script.js"></script>
+<div class="app">
+  <!-- ═══════════ SIDEBAR ═══════════ -->
+  <nav class="sidebar">
+    <div class="logo">🏥 Clínica Nise</div>
+
+    <div class="nav-group">
+      <div class="nav-label">Principal</div>
+      <button class="nav-item active" onclick="navigate('dashboard')">
+        <span class="icon">📊</span> Dashboard
+      </button>
+      <button class="nav-item" onclick="navigate('agendamentos')">
+        <span class="icon">📅</span> Agendamentos
+      </button>
+      <button class="nav-item" onclick="navigate('nova-consulta')">
+        <span class="icon">➕</span> Nova Consulta
+      </button>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Cadastros</div>
+      <button class="nav-item" onclick="navigate('medicos')">
+        <span class="icon">👨‍⚕️</span> Médicos
+      </button>
+      <button class="nav-item" onclick="navigate('pacientes')">
+        <span class="icon">🧑‍🤝‍🧑</span> Pacientes
+      </button>
+    </div>
+  </nav>
+
+  <!-- ═══════════ MAIN ═══════════ -->
+  <div class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <h1 id="page-title">Dashboard</h1>
+      <div class="badge-status">
+        <span class="dot"></span> Backend: localhost:8080
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="syncAll()">🔄 Sincronizar</button>
+    </div>
+
+    <!-- Content area -->
+    <div class="content">
+
+      <!-- ═══ DASHBOARD ═══ -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="label">Consultas hoje</div>
+            <div class="value accent-val" id="stat-hoje">0</div>
+            <div class="sub" id="stat-hoje-sub">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Médicos cadastrados</div>
+            <div class="value green-val" id="stat-medicos">0</div>
+            <div class="sub">ativos</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Pacientes cadastrados</div>
+            <div class="value green-val" id="stat-pacientes">0</div>
+            <div class="sub">ativos</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Próximos 7 dias</div>
+            <div class="value amber-val" id="stat-semana">0</div>
+            <div class="sub">agendadas</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>📅 Próximas consultas</h2>
+            <button class="btn btn-primary btn-sm" onclick="navigate('nova-consulta')">+ Agendar</button>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Paciente</th><th>Médico</th><th>Especialidade</th>
+                  <th>Data/Hora</th><th>Status</th><th></th>
+                </tr></thead>
+                <tbody id="tbody-proximas">
+                  <tr><td colspan="6">
+                    <div class="empty-state">
+                      <div class="icon">📋</div>Nenhuma consulta agendada
+                    </div>
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ AGENDAMENTOS ═══ -->
+      <div class="page" id="page-agendamentos">
+        <div class="card">
+          <div class="card-header">
+            <h2>📆 Calendário de consultas</h2>
+            <button class="btn btn-primary btn-sm" onclick="navigate('nova-consulta')">+ Nova consulta</button>
+          </div>
+          <div class="card-body">
+            <div class="cal-strip" id="cal-strip"></div>
+            <div class="flex-row" style="margin-bottom:1rem;gap:.5rem">
+              <input class="search-input"
+                     placeholder="🔍 Buscar paciente ou médico..."
+                     id="search-agenda"
+                     oninput="renderAgenda()">
+              <select class="search-input" style="width:auto" id="filter-status" onchange="renderAgenda()">
+                <option value="">Todos os status</option>
+                <option value="Agendada">Agendada</option>
+                <option value="Confirmada">Confirmada</option>
+                <option value="Realizada">Realizada</option>
+                <option value="Cancelada">Cancelada</option>
+              </select>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Paciente</th><th>Médico</th><th>Especialidade</th>
+                  <th>Data/Hora</th><th>Motivo</th><th>Status</th><th>Ações</th>
+                </tr></thead>
+                <tbody id="tbody-agenda"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ NOVA CONSULTA ═══ -->
+      <div class="page" id="page-nova-consulta">
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:1.25rem;align-items:start">
+          <!-- Formulário principal -->
+          <div>
+            <div class="card">
+              <div class="card-header"><h2>📋 Dados da consulta</h2></div>
+              <div class="card-body">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Paciente *</label>
+                    <select id="sel-paciente">
+                      <option value="">Selecione um paciente</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Médico *</label>
+                    <select id="sel-medico" onchange="onMedicoChange()">
+                      <option value="">Selecione um médico</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Especialidade</label>
+                    <input id="inp-especialidade" readonly placeholder="Preenchido pelo médico">
+                  </div>
+                  <div class="field">
+                    <label>Motivo da consulta *</label>
+                    <input id="inp-motivo" placeholder="Ex: Retorno, dor de cabeça...">
+                  </div>
+                  <div class="field">
+                    <label>Data *</label>
+                    <input type="date" id="inp-data" onchange="renderTimeSlots()">
+                  </div>
+                  <div class="field">
+                    <label>Horário *</label>
+                    <input id="inp-horario-display" readonly placeholder="Selecione ao lado →">
+                    <input type="hidden" id="inp-horario">
+                  </div>
+                  <div class="field form-col-2">
+                    <label>Observações</label>
+                    <textarea id="inp-obs" placeholder="Observações adicionais (opcional)"></textarea>
+                  </div>
+                </div>
+                <div style="margin-top:1rem;display:flex;justify-content:flex-end;gap:.6rem">
+                  <button class="btn btn-secondary" onclick="limparForm()">Limpar</button>
+                  <button class="btn btn-primary"   onclick="agendarConsulta()">✅ Confirmar agendamento</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Painel lateral: horários + resumo -->
+          <div>
+            <div class="card">
+              <div class="card-header"><h2>🕐 Horários disponíveis</h2></div>
+              <div class="card-body">
+                <div id="slot-placeholder" class="empty-state" style="padding:1.5rem .5rem">
+                  <div class="icon">📅</div>Selecione médico e data
+                </div>
+                <div class="time-grid" id="time-grid" style="display:none"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><h2>📌 Resumo</h2></div>
+              <div class="card-body" id="resumo-consulta"
+                   style="font-size:.85rem;line-height:1.9;color:var(--muted)">
+                Preencha os campos ao lado.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MÉDICOS ═══ -->
+      <div class="page" id="page-medicos">
+        <div class="card">
+          <div class="card-header">
+            <h2>👨‍⚕️ Médicos cadastrados</h2>
+            <div class="flex-row">
+              <input class="search-input" placeholder="🔍 Buscar..."
+                     id="search-medico" oninput="renderMedicos()">
+              <button class="btn btn-primary btn-sm"
+                      onclick="openModal('modal-medico')">+ Novo médico</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Nome</th><th>CRM</th><th>Especialidade</th>
+                  <th>Consultas</th><th>Ações</th>
+                </tr></thead>
+                <tbody id="tbody-medicos"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ PACIENTES ═══ -->
+      <div class="page" id="page-pacientes">
+        <div class="card">
+          <div class="card-header">
+            <h2>🧑‍🤝‍🧑 Pacientes cadastrados</h2>
+            <div class="flex-row">
+              <input class="search-input" placeholder="🔍 Buscar..."
+                     id="search-paciente-list" oninput="renderPacientes()">
+              <button class="btn btn-primary btn-sm"
+                      onclick="openModal('modal-paciente')">+ Novo paciente</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Nome</th><th>CPF</th><th>Convênio</th>
+                  <th>Alergias</th><th>Consultas</th><th>Ações</th>
+                </tr></thead>
+                <tbody id="tbody-pacientes"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ═══════ MODAL MÉDICO ═══════ -->
+<div class="modal-backdrop" id="modal-medico">
+  <div class="modal">
+    <div class="modal-title" id="modal-medico-title">👨‍⚕️ Cadastrar Médico</div>
+    <input type="hidden" id="medico-edit-id">
+    <div class="form-grid">
+      <div class="field form-col-2">
+        <label>Nome completo *</label>
+        <input id="m-nome" placeholder="Dr. João Silva">
+      </div>
+      <div class="field">
+        <label>CRM *</label>
+        <input id="m-crm" placeholder="CRM/SP 123456">
+      </div>
+      <div class="field">
+        <label>Especialidade *</label>
+        <input id="m-especialidade" placeholder="Cardiologia">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-medico')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="salvarMedico()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ MODAL PACIENTE ═══════ -->
+<div class="modal-backdrop" id="modal-paciente">
+  <div class="modal">
+    <div class="modal-title" id="modal-paciente-title">🧑 Cadastrar Paciente</div>
+    <input type="hidden" id="paciente-edit-id">
+    <div class="form-grid">
+      <div class="field form-col-2">
+        <label>Nome completo *</label>
+        <input id="p-nome" placeholder="Maria Souza">
+      </div>
+      <div class="field">
+        <label>CPF *</label>
+        <input id="p-cpf" placeholder="000.000.000-00"
+               maxlength="14" oninput="maskCPF(this)">
+      </div>
+      <div class="field">
+        <label>Convênio</label>
+        <input id="p-convenio" placeholder="Unimed, Amil, Particular...">
+      </div>
+      <div class="field form-col-2">
+        <label>Alergias</label>
+        <input id="p-alergias" placeholder="Ex: Penicilina, AAS...">
+      </div>
+      <div class="field form-col-2">
+        <label>Prontuário / Observações</label>
+        <textarea id="p-prontuario"
+                  placeholder="Histórico médico relevante..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-paciente')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="salvarPaciente()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ MODAL DETALHE CONSULTA ═══════ -->
+<div class="modal-backdrop" id="modal-consulta-detalhe">
+  <div class="modal">
+    <div class="modal-title">📋 Detalhes da consulta</div>
+    <div id="consulta-detalhe-body" style="font-size:.875rem;line-height:2"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary"
+              onclick="closeModal('modal-consulta-detalhe')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div id="toast"></div>
+
+<script src="script.js"></script>
 </body>
 </html>
