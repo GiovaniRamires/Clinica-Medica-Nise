@@ -12,7 +12,12 @@
     @Data
     @NoArgsConstructor
     public class Agendamento {
-
+        public enum SituacaoAgendamento {
+            AGENDADO,
+            CONFIRMADO,
+            REALIZADO,
+            AUSENTE
+        }
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         private Long id;
@@ -26,7 +31,7 @@
         @JoinColumn(name = "medico_id")
         private Medico medico;
 
-        @Column (nullable = false)
+        @ManyToOne(optional = false)
         private LocalDate data;
 
         @Column(nullable = false)
