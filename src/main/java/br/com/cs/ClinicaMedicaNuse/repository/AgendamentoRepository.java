@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-import static br.com.cs.ClinicaMedicaNuse.entity.Agendamento.SituacaoAgendamento;
+import br.com.cs.ClinicaMedicaNuse.entity.SituacaoAgendamento;
 
 
 @Repository
