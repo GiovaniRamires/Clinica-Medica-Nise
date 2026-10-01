@@ -31,7 +31,7 @@
         @JoinColumn(name = "medico_id")
         private Medico medico;
 
-        @ManyToOne(optional = false)
+        @Column(nullable = false)
         private LocalDate data;
 
         @Column(nullable = false)
