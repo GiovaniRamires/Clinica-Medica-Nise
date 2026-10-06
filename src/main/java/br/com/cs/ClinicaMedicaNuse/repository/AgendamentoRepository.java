@@ -10,7 +10,6 @@ import java.time.LocalTime;
 
 import static br.com.cs.ClinicaMedicaNuse.entity.Agendamento.SituacaoAgendamento;
 
-
 @Repository
 public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> {
 

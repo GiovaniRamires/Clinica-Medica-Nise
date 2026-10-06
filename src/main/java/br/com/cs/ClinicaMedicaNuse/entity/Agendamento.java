@@ -16,7 +16,8 @@
             AGENDADO,
             CONFIRMADO,
             REALIZADO,
-            AUSENTE
+            AUSENTE,
+            CANCELADO
         }
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
