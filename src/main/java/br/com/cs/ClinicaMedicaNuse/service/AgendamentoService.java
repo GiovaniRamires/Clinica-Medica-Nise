@@ -29,7 +29,7 @@ public class AgendamentoService {
         var paciente = pacienteService.buscarPacientePorId(pacienteId);
         var medico = medicoService.buscarMedicoPorId(medicoId);
 
-        boolean horarioOcupado = agendamentoRepository.existsMedicoIdAndDataAndHorarioAndSituacaoNot(medicoId, data, horario, SituacaoAgendamento.CANCELADO);
+        boolean horarioOcupado = agendamentoRepository.existsByMedicoIdAndDataAndHorarioAndSituacaoNot(medicoId, data, horario, SituacaoAgendamento.CANCELADO);
         if (horarioOcupado) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "O médico já possui um agendamento nesse dia e horário");
         }

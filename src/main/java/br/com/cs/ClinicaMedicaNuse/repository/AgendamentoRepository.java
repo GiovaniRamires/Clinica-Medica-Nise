@@ -14,5 +14,5 @@ import static br.com.cs.ClinicaMedicaNuse.entity.Agendamento.SituacaoAgendamento
 public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> {
 
 
-    boolean existsMedicoIdAndDataAndHorarioAndSituacaoNot(Long medicoId, LocalDate data, LocalTime horario, SituacaoAgendamento situacao);
+    boolean existsByMedicoIdAndDataAndHorarioAndSituacaoNot(Long medicoId, LocalDate data, LocalTime horario, SituacaoAgendamento situacao);
 }
