@@ -33,17 +33,7 @@ public class ConsultaController {
         return ResponseEntity.status(HttpStatus.OK).body(consultas);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Consulta> buscarPorId(@PathVariable Long id) {
-        var consulta = consultaService.buscarConsultaPorId(id);
-        return ResponseEntity.status(HttpStatus.OK).body(consulta);
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<Consulta> atualizar(@PathVariable Long id, @Valid @RequestBody Consulta consulta) {
-        consulta = consultaService.atualizar(id, consulta.getQueixaPrincipal(), consulta.getObservacoesMedicas(), consulta.getDiagnostico(), consulta.getConduta());
-        return ResponseEntity.status(HttpStatus.OK).body(consulta);
-    }
+      
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {

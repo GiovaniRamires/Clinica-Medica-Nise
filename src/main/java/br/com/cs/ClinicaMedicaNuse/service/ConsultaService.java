@@ -1,8 +1,10 @@
 package br.com.cs.ClinicaMedicaNuse.service;
 
+import br.com.cs.ClinicaMedicaNuse.entity.Agendamento;
 import br.com.cs.ClinicaMedicaNuse.entity.Consulta;
 import br.com.cs.ClinicaMedicaNuse.repository.AgendamentoRepository;
 import br.com.cs.ClinicaMedicaNuse.repository.ConsultaRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -19,13 +21,32 @@ public class ConsultaService {
         this.agendamentoRepository = agendamentoRepository;
     }
 
+    @Transactional
     public Consulta criar(Long agendamentoId, String queixaPrincipal, String observacoesMedicas, String diagnostico, String conduta) {
         var agendamento = agendamentoRepository.findById(agendamentoId).orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.NOT_FOUND,
                 "Agendamento id: " + agendamentoId + " não encontrado"));
+        var situacao = agendamento.getSituacao();
+
+        if (situacao == Agendamento.SituacaoAgendamento.CANCELADO) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possivel ter uma consulta com um agendamento cancelado!");
+        }
+        if (situacao == Agendamento.SituacaoAgendamento.AUSENTE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Paciente ausente, não é possivel registrar atendimento!");
+        }
+        if (situacao == Agendamento.SituacaoAgendamento.REALIZADO) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Agendamento já realizou uma consulta!");
+        }
         Consulta consulta = new Consulta(agendamento, queixaPrincipal, observacoesMedicas, diagnostico, conduta);
-        return consultaRepository.save(consulta);
+        consultaRepository.save(consulta);
+
+        agendamento.setSituacao(Agendamento.SituacaoAgendamento.REALIZADO);
+        agendamentoRepository.save(agendamento);
+        return consulta;
+
+
     }
+
 
     public List<Consulta> listarConsultas() {
         return consultaRepository.findAll();
