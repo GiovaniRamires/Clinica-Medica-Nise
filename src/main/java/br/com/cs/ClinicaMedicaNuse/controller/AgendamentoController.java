@@ -20,6 +20,9 @@ public class AgendamentoController {
 
     @PostMapping
     public ResponseEntity<Agendamento> criarAgendamento(@Valid @RequestBody Agendamento agendamento) {
+        if(agendamento.getPaciente() == null || agendamento.getPaciente().getId() == null || agendamento.getMedico() == null || agendamento.getMedico().getId() == null){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
         var novoAgendamento = agendamentoService.criar(
                 agendamento.getPaciente().getId(),
                 agendamento.getMedico().getId(),
@@ -41,10 +44,11 @@ public class AgendamentoController {
         return ResponseEntity.status(HttpStatus.OK).body(agendamento);
     }
 
-    @PutMapping("/{id}/realizado")
-    public ResponseEntity<Agendamento> marcarComoRealizado(@PathVariable Long id) {
-        var agendamento = agendamentoService.buscarAgendamentosPorId(id);
-        agendamento = agendamentoService.marcarComoRealizado(agendamento);
+    @PutMapping("/{id}/situacao")
+    public ResponseEntity<Agendamento> alterarSituacao(@PathVariable Long id, @RequestParam Agendamento.SituacaoAgendamento situacao) {
+
+
+        var agendamento = agendamentoService.alterarSituacao(id, situacao);
         return ResponseEntity.status(HttpStatus.OK).body(agendamento);
     }
 }

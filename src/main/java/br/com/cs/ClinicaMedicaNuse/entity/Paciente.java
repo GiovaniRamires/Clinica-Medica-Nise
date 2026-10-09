@@ -18,7 +18,7 @@ public class Paciente {
     @NotBlank
     private String nome;
 
-    @Column
+    @Column(unique = true, nullable = false)
     @NotBlank
     private String cpf;
 

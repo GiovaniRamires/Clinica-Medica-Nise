@@ -17,6 +17,9 @@ public class PacienteService {
     }
 
     public Paciente criar (String nome, String cpf, String convenio, String alergias, String prontuario){
+        if(pacienteRepository.existsByCpf(cpf)){
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Paciente com CPF já cadastrado");
+        }
         Paciente paciente = new Paciente(nome, cpf, convenio, alergias, prontuario);
         pacienteRepository.save(paciente);
         return paciente;

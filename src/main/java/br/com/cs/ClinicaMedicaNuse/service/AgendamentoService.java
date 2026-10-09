@@ -53,4 +53,28 @@ public class AgendamentoService {
         return agendamentoRepository.save(agendamento);
     }
 
+    public Agendamento alterarSituacao(Long id, SituacaoAgendamento nova){
+        var agendamento = buscarAgendamentosPorId(id);
+        var atual = agendamento.getSituacao();
+
+        boolean permitido = switch (atual){
+            case AGENDADO -> nova == SituacaoAgendamento.CONFIRMADO
+                    || nova == SituacaoAgendamento.CANCELADO
+                    || nova == SituacaoAgendamento.AUSENTE;
+            case CONFIRMADO ->  nova == SituacaoAgendamento.CANCELADO
+                    || nova == SituacaoAgendamento.AUSENTE;
+            default -> false;
+        };
+
+        if(!permitido){
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível mudar a situação de " + atual "para " + nova);
+        }
+
+        agendamento.setSituacao(nova);
+        return agendamentoRepository.save(agendamento);
+
+    }
+
+
+
 }
