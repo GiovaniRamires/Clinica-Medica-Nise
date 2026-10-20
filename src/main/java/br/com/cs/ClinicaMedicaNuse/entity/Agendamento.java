@@ -1,6 +1,7 @@
     package br.com.cs.ClinicaMedicaNuse.entity;
 
     import jakarta.persistence.*;
+    import jakarta.validation.constraints.NotNull;
     import lombok.Data;
     import lombok.NoArgsConstructor;
 
@@ -33,9 +34,11 @@
         private Medico medico;
 
         @Column(nullable = false)
+        @NotNull
         private LocalDate data;
 
         @Column(nullable = false)
+        @NotNull
         private LocalTime horario;
 
 
