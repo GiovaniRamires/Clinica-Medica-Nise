@@ -31,6 +31,10 @@ public class ConsultaService {
         return consultaRepository.findAll();
     }
 
+    public List<Consulta> listarPorPaciente(Long pacienteId){
+        return consultaRepository.findByPacienteIdOrderByDataDescHorarioDesc(pacienteId);
+    }
+
     public Consulta buscarConsultaPorId(Long id) {
         return consultaRepository.findById(id).orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.NOT_FOUND,

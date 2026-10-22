@@ -1,6 +1,9 @@
 package br.com.cs.ClinicaMedicaNuse.controller;
 
+import br.com.cs.ClinicaMedicaNuse.dto.ProntuarioResponse;
+import br.com.cs.ClinicaMedicaNuse.entity.Consulta;
 import br.com.cs.ClinicaMedicaNuse.entity.Paciente;
+import br.com.cs.ClinicaMedicaNuse.service.ConsultaService;
 import br.com.cs.ClinicaMedicaNuse.service.PacienteService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -13,8 +16,10 @@ import java.util.List;
 @RequestMapping("/pacientes")
 public class PacienteController {
     private final PacienteService pacienteService;
-    public PacienteController (PacienteService pacienteService){
+    private final ConsultaService consultaService;
+    public PacienteController (PacienteService pacienteService, ConsultaService consultaService){
         this.pacienteService = pacienteService;
+        this.consultaService = consultaService;
     }
     @PostMapping
     public ResponseEntity<Paciente> criarPaciente (@Valid @RequestBody Paciente paciente){
@@ -44,4 +49,15 @@ public class PacienteController {
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
+    @GetMapping("/{id}/consultas")
+    public ResponseEntity<List<Consulta>> historico(@PathVariable Long id){
+        pacienteService.buscarPacientePorId(id);
+        return ResponseEntity.ok(consultaService.listarPorPaciente(id));
+    }
+
+    @GetMapping("/{id}/prontuario")
+    public ResponseEntity<ProntuarioResponse> prontuario(@PathVariable Long id){
+        return ResponseEntity.ok(new ProntuarioResponse(
+                pacienteService.buscarPacientePorId(id), consultaService.listarPorPaciente(id)));
+    }
 }
