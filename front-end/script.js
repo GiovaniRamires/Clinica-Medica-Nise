@@ -290,7 +290,7 @@ async function abrirAplicacao() {
     `;
 
     aplicarPermissoes();
-    trocarAba('pacientes');
+    trocarAba('dashboard');
     await carregarTudo();
 }
 
@@ -302,8 +302,187 @@ async function carregarTudo() {
         await carregarAgendamentos();
         if (podeVerDadoClinico()) await carregarConsultas();
         if (ehAdministrador()) await carregarUsuarios();
+        renderizarDashboard();
     } catch (erro) {
         mostrarToast(erro.mensagem, 'erro');
+    }
+}
+
+
+/* ============================== DASHBOARD ============================= */
+/* Espelha o Dashboard.tsx do protótipo: 4 cards de resumo, o card de próximo
+   atendimento, ações rápidas, alertas e a lista de hoje/amanhã — só que com
+   dados vindos da API em vez de valores fixos no componente. */
+
+/** Atualiza o dashboard só se a aplicação já estiver na tela (evita
+ *  renderizar antes da primeira carga, quando os elementos ainda não
+ *  têm todos os dados prontos). */
+function atualizarDashboardSeAberto() {
+    if (!document.getElementById('aplicacao').classList.contains('oculto')) {
+        renderizarDashboard();
+    }
+}
+
+function renderizarDashboard() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const amanha = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+
+    const agendaAbertaOrdenada = agendamentos
+        .filter(a => SITUACOES_ABERTAS.includes(a.situacao))
+        .sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario));
+
+    const deHojeOuAmanha = agendaAbertaOrdenada.filter(a => a.data === hoje || a.data === amanha);
+    const proximo = agendaAbertaOrdenada[0];
+
+    // ---- cards de resumo ----
+    const cards = [
+        {
+            rotulo: 'Próximo atendimento',
+            valor: proximo ? formatarData(proximo.data) : '—',
+            sub: proximo ? proximo.horario : 'Nenhum agendado',
+            cor: '#1d4ed8'
+        },
+        {rotulo: 'Agendamentos abertos', valor: agendaAbertaOrdenada.length, sub: 'Agendados ou confirmados', cor: '#16a34a'},
+        {rotulo: 'Pacientes cadastrados', valor: pacientes.length, sub: 'Total na base', cor: '#16a34a'},
+        {rotulo: 'Médicos ativos', valor: medicos.length, sub: 'No corpo clínico', cor: '#475569'}
+    ];
+    document.getElementById('cards-resumo').innerHTML = cards.map(c => `
+        <div class="card-resumo">
+            <p class="card-resumo-rotulo">${esc(c.rotulo)}</p>
+            <p class="card-resumo-valor" style="color:${c.cor}">${esc(c.valor)}</p>
+            <p class="card-resumo-sub">${esc(c.sub)}</p>
+        </div>
+    `).join('');
+
+    // ---- card "próximo atendimento" ----
+    const cartaoProximo = document.getElementById('cartao-proximo-atendimento');
+    if (!proximo) {
+        cartaoProximo.innerHTML = `
+            <div class="cartao-corpo">
+                <h2 class="cartao-titulo" style="margin-bottom:8px">Nenhum atendimento agendado</h2>
+                <p class="dica">Agende uma consulta para o próximo paciente aparecer aqui.</p>
+            </div>`;
+    } else {
+        cartaoProximo.innerHTML = `
+            <div class="cartao-corpo">
+                <div class="proximo-atendimento-cabecalho">
+                    <div>
+                        <h2 class="cartao-titulo" style="margin-bottom:8px">Próximo atendimento</h2>
+                        <span class="selo selo--${esc(proximo.situacao)}">${esc(proximo.situacao)}</span>
+                    </div>
+                    <span class="dica">${esc(formatarData(proximo.data))}</span>
+                </div>
+                <div class="proximo-atendimento-linhas">
+                    <div><p class="ficha-rotulo">Paciente</p><p class="ficha-valor">${esc(proximo.paciente.nome)}</p></div>
+                    <div><p class="ficha-rotulo">Médico</p><p class="ficha-valor">${esc(proximo.medico.nome)} (${esc(proximo.medico.especialidade)})</p></div>
+                    <div><p class="ficha-rotulo">Horário</p><p class="ficha-valor">${esc(proximo.horario)}</p></div>
+                    <div><p class="ficha-rotulo">Observações</p><p class="ficha-valor">${esc(proximo.observacoes)}</p></div>
+                </div>
+            </div>`;
+    }
+
+    // ---- alertas ----
+    const alertas = [];
+    const semMedico = pacientes.length > 0 && medicos.length === 0;
+    if (semMedico) {
+        alertas.push({
+            tipo: 'aviso', icone: '⚠️', titulo: 'Nenhum médico cadastrado',
+            texto: 'Cadastre um médico para poder marcar agendamentos.'
+        });
+    }
+    const consultasAFazer = agendamentos.filter(a => SITUACOES_ABERTAS.includes(a.situacao) && (a.data === hoje));
+    if (consultasAFazer.length > 0 && podeVerDadoClinico()) {
+        alertas.push({
+            tipo: 'info', icone: 'ℹ️', titulo: `${consultasAFazer.length} atendimento(s) hoje`,
+            texto: 'Confira a agenda do dia antes de começar os atendimentos.'
+        });
+    }
+    document.getElementById('alertas-dashboard').innerHTML = alertas.map(a => `
+        <div class="alerta alerta--${a.tipo}">
+            <span class="alerta-icone">${a.icone}</span>
+            <div>
+                <p class="alerta-titulo">${esc(a.titulo)}</p>
+                <p class="alerta-texto">${esc(a.texto)}</p>
+            </div>
+        </div>
+    `).join('');
+
+    // ---- lista de hoje/amanhã ----
+    const lista = document.getElementById('lista-dashboard');
+    if (deHojeOuAmanha.length === 0) {
+        lista.innerHTML = '<p class="vazio" style="padding:20px 24px">Nenhum agendamento para hoje ou amanhã.</p>';
+    } else {
+        lista.innerHTML = deHojeOuAmanha.map(a => `
+            <div class="item-lista-dashboard">
+                <div>
+                    <p class="item-lista-titulo">${esc(a.paciente.nome)}</p>
+                    <p class="item-lista-sub">${esc(formatarData(a.data))} · ${esc(a.horario)} · ${esc(a.medico.nome)}</p>
+                </div>
+                <span class="selo selo--${esc(a.situacao)}">${esc(a.situacao)}</span>
+            </div>
+        `).join('');
+    }
+
+    // O cartão de demonstração só faz sentido com o banco vazio.
+    document.getElementById('cartao-demo').classList.toggle('oculto', pacientes.length > 0 || medicos.length > 0);
+}
+
+/**
+ * Cria pacientes, médicos e agendamentos fictícios pela própria API, no
+ * mesmo espírito dos dados de exemplo do protótipo Figma (lá: professor
+ * Carlos Almeida, turma ADS, alunos João Silva/Maria Souza/...). Aqui:
+ * nomes, CPFs e CRMs fictícios de uma clínica.
+ */
+async function criarDadosDemonstracao() {
+    const botao = document.getElementById('botao-seed');
+    botao.disabled = true;
+    botao.textContent = 'Criando…';
+
+    try {
+        const medicosSeed = [
+            {nome: 'Dra. Erika Miranda', crm: '111111/SP', especialidade: 'Cardiologia'},
+            {nome: 'Dr. Rafael Nunes', crm: '222222/SP', especialidade: 'Clínica Geral'}
+        ];
+        const pacientesSeed = [
+            {nome: 'João Silva', cpf: '11111111111', convenio: 'Unimed', alergias: 'Dipirona', prontuario: 'Hipertenso, uso continuo de losartana.'},
+            {nome: 'Maria Souza', cpf: '22222222222', convenio: 'Particular', alergias: 'Nenhuma conhecida', prontuario: 'Sem comorbidades.'},
+            {nome: 'Ana Oliveira', cpf: '33333333333', convenio: 'Bradesco Saúde', alergias: 'Penicilina', prontuario: 'Alérgica a penicilina, atenção na prescrição.'},
+            {nome: 'Lucas Santos', cpf: '44444444444', convenio: 'Particular', alergias: 'Nenhuma conhecida', prontuario: ''}
+        ];
+
+        const idsMedicos = [];
+        for (const m of medicosSeed) {
+            const criado = await requisicao('/medicos', 'POST', m);
+            idsMedicos.push(criado.id);
+        }
+
+        const idsPacientes = [];
+        for (const p of pacientesSeed) {
+            const criado = await requisicao('/pacientes', 'POST', p);
+            idsPacientes.push(criado.id);
+        }
+
+        const hoje = new Date();
+        const horarios = ['09:00', '10:30', '14:00', '16:00'];
+        for (let i = 0; i < idsPacientes.length; i++) {
+            const data = new Date(hoje.getTime() + i * 86400000).toISOString().slice(0, 10);
+            await requisicao('/agendamentos', 'POST', {
+                pacienteId: idsPacientes[i],
+                medicoId: idsMedicos[i % idsMedicos.length],
+                data: data,
+                horario: horarios[i % horarios.length],
+                observacoes: i === 0 ? 'Retorno de exames' : ''
+            });
+        }
+
+        mostrarToast('Dados de demonstração criados: ' + pacientesSeed.length + ' pacientes, '
+            + medicosSeed.length + ' médicos e ' + idsPacientes.length + ' agendamentos.', 'ok');
+        await carregarTudo();
+    } catch (erro) {
+        mostrarToast(erro.mensagem, 'erro');
+    } finally {
+        botao.disabled = false;
+        botao.textContent = '✨ Criar dados de demonstração';
     }
 }
 
@@ -314,6 +493,7 @@ async function carregarPacientes() {
     pacientes = await requisicao('/pacientes');
     mostrarPacientes();
     atualizarSelectsDePaciente();
+    atualizarDashboardSeAberto();
 }
 
 function mostrarPacientes() {
@@ -420,6 +600,7 @@ async function carregarMedicos() {
     const itens = medicos.map(m => ({valor: m.id, texto: m.nome + ' — ' + m.especialidade}));
     preencherSelect(document.getElementById('form-agendamento').elements.medicoId,
         itens, 'Nenhum médico cadastrado');
+    atualizarDashboardSeAberto();
 }
 
 function mostrarMedicos() {
@@ -523,6 +704,7 @@ async function carregarAgendamentos() {
     }));
     preencherSelect(document.getElementById('form-consulta').elements.agendamentoId,
         itens, 'Nenhum agendamento aberto');
+    atualizarDashboardSeAberto();
 }
 
 function mostrarAgendamentos() {
