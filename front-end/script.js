@@ -39,34 +39,6 @@ let consultas = [];
 let usuarios = [];
 
 
-/* ============================== ÍCONES ================================ */
-/* Pequeno subconjunto de ícones no estilo Lucide (traço), inline como SVG. */
-
-const ICONES = {
-    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
-    userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
-    user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
-    calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
-    clipboard: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/>',
-    book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
-    shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
-    logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
-    lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
-};
-
-function icone(nome) {
-    return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[nome] || ''}</svg>`;
-}
-
-/** Substitui os placeholders data-icon="nome" pelo SVG correspondente. */
-function montarIcones(raiz) {
-    (raiz || document).querySelectorAll('[data-icon]').forEach(el => {
-        const nome = el.dataset.icon;
-        if (nome && ICONES[nome]) el.innerHTML = icone(nome);
-    });
-}
-
-
 /* ============================= AJUDANTES ============================= */
 
 /** Escapa o texto do usuário antes de jogar no HTML (evita quebrar a página). */
@@ -101,18 +73,15 @@ function iniciais(nome) {
     return (primeira + ultima).toUpperCase();
 }
 
+/** Primeiro nome, para a saudação "Olá, Maria!" no topo. */
+function primeiroNome(nome) {
+    return nome ? nome.trim().split(/\s+/)[0] : '';
+}
+
 const PERFIS = {
     ADMINISTRADOR: 'Administrador',
     MEDICO: 'Médico',
     RECEPCIONISTA: 'Recepcionista'
-};
-
-const SELOS_SITUACAO = {
-    AGENDADO: 'badge-info',
-    CONFIRMADO: 'badge-info',
-    REALIZADO: 'badge-success',
-    AUSENTE: 'badge-warning',
-    CANCELADO: 'badge-danger'
 };
 
 function perfilAtual() {
@@ -167,12 +136,12 @@ async function requisicao(caminho, metodo = 'GET', corpo = null) {
     return dados;
 }
 
-/** Mostra um toast no canto da tela, no estilo do SisLab. */
+/** Mostra um toast no canto da tela, no estilo do protótipo. */
 function mostrarToast(texto, tipo = 'info') {
     const container = document.getElementById('toasts');
     const toast = document.createElement('div');
-    toast.className = 'toast ' + (tipo === 'erro' ? 'error' : tipo === 'ok' ? 'success' : '');
-    toast.innerHTML = `<span class="toast-text">${esc(texto)}</span>`;
+    toast.className = 'toast ' + (tipo === 'erro' ? 'erro' : tipo === 'ok' ? 'sucesso' : '');
+    toast.textContent = texto;
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 5000);
 }
@@ -188,10 +157,10 @@ function lerFormulario(form) {
 }
 
 function limparErros(form) {
-    form.querySelectorAll('.field.has-error').forEach(campo => {
-        campo.classList.remove('has-error');
-        const erro = campo.querySelector('.field-error');
-        if (erro) erro.textContent = '';
+    form.querySelectorAll('[aria-invalid="true"]').forEach(campo => campo.removeAttribute('aria-invalid'));
+    form.querySelectorAll('.erro-campo').forEach(erro => {
+        erro.textContent = '';
+        erro.classList.add('oculto');
     });
 }
 
@@ -204,11 +173,13 @@ function mostrarErros(form, erro) {
     erro.campos.forEach(item => {
         const entrada = form.elements[item.campo];
         if (!entrada) return;
-        const campo = entrada.closest('.field');
-        if (!campo) return;
-        campo.classList.add('has-error');
-        const mensagem = campo.querySelector('.field-error');
-        if (mensagem) mensagem.textContent = item.mensagem;
+        entrada.setAttribute('aria-invalid', 'true');
+        const campo = entrada.closest('.campo');
+        const mensagem = campo && campo.querySelector('.erro-campo');
+        if (mensagem) {
+            mensagem.textContent = item.mensagem;
+            mensagem.classList.remove('oculto');
+        }
     });
     mostrarToast('Corrija os campos destacados.', 'erro');
 }
@@ -231,14 +202,10 @@ function trocarAba(nome) {
     document.querySelectorAll('.nav-item[data-painel]').forEach(botao => {
         botao.classList.toggle('active', botao.dataset.painel === nome);
     });
-    document.querySelectorAll('.view').forEach(painel => {
+    document.querySelectorAll('.pagina').forEach(painel => {
         painel.classList.toggle('oculto', painel.id !== 'painel-' + nome);
     });
-    const titulos = {
-        pacientes: 'Pacientes', medicos: 'Médicos', agenda: 'Agenda',
-        consultas: 'Consultas', prontuario: 'Prontuário', usuarios: 'Usuários', conta: 'Minha conta'
-    };
-    document.getElementById('titulo-painel').textContent = titulos[nome] || '';
+    document.getElementById('aplicacao').classList.remove('menu-aberto');
 }
 
 
@@ -313,14 +280,13 @@ async function abrirAplicacao() {
     document.getElementById('aplicacao').classList.remove('oculto');
 
     const usuario = sessao.usuario;
-    document.getElementById('usuario-nome').textContent = usuario.nome;
-    document.getElementById('usuario-perfil').textContent = PERFIS[usuario.perfil] || usuario.perfil;
+    document.getElementById('saudacao-nome').textContent = primeiroNome(usuario.nome) + '!';
     document.getElementById('usuario-avatar').textContent = iniciais(usuario.nome);
 
     document.getElementById('ficha-conta').innerHTML = `
-        <div><p class="kv-label">Nome</p><p class="kv-value">${esc(usuario.nome)}</p></div>
-        <div><p class="kv-label">E-mail</p><p class="kv-value">${esc(usuario.email)}</p></div>
-        <div><p class="kv-label">Perfil</p><p class="kv-value">${esc(PERFIS[usuario.perfil] || usuario.perfil)}</p></div>
+        <div><p class="ficha-rotulo">Nome</p><p class="ficha-valor">${esc(usuario.nome)}</p></div>
+        <div><p class="ficha-rotulo">E-mail</p><p class="ficha-valor">${esc(usuario.email)}</p></div>
+        <div><p class="ficha-rotulo">Perfil</p><p class="ficha-valor">${esc(PERFIS[usuario.perfil] || usuario.perfil)}</p></div>
     `;
 
     aplicarPermissoes();
@@ -361,12 +327,12 @@ function mostrarPacientes() {
     }
 
     tabela.innerHTML = pacientes.map(paciente => {
-        let acoes = `<button class="btn btn-secondary btn-sm" onclick="editarPaciente(${paciente.id})">Editar</button>`;
+        let acoes = `<button class="botao botao--secundario botao--pequeno" onclick="editarPaciente(${paciente.id})">Editar</button>`;
         if (clinico) {
-            acoes += `<button class="btn btn-secondary btn-sm" onclick="verProntuario(${paciente.id})">Prontuário</button>`;
+            acoes += `<button class="botao botao--secundario botao--pequeno" onclick="verProntuario(${paciente.id})">Prontuário</button>`;
         }
         if (ehAdministrador()) {
-            acoes += `<button class="btn btn-danger-soft btn-sm" onclick="excluirPaciente(${paciente.id})">Excluir</button>`;
+            acoes += `<button class="botao botao--perigo botao--pequeno" onclick="excluirPaciente(${paciente.id})">Excluir</button>`;
         }
         // Alergias é dado clínico: a coluna só existe para quem pode ver.
         const alergias = clinico ? `<td>${esc(paciente.alergias)}</td>` : '';
@@ -376,7 +342,7 @@ function mostrarPacientes() {
                 <td>${esc(formatarCpf(paciente.cpf))}</td>
                 <td>${esc(paciente.convenio)}</td>
                 ${alergias}
-                <td><div class="actions">${acoes}</div></td>
+                <td><div class="acoes-linha">${acoes}</div></td>
             </tr>
         `;
     }).join('');
@@ -468,15 +434,15 @@ function mostrarMedicos() {
     tabela.innerHTML = medicos.map(medico => {
         // Manutenção do corpo clínico é só do administrador.
         const acoes = ehAdministrador()
-            ? `<button class="btn btn-secondary btn-sm" onclick="editarMedico(${medico.id})">Editar</button>
-               <button class="btn btn-danger-soft btn-sm" onclick="excluirMedico(${medico.id})">Excluir</button>`
+            ? `<button class="botao botao--secundario botao--pequeno" onclick="editarMedico(${medico.id})">Editar</button>
+               <button class="botao botao--perigo botao--pequeno" onclick="excluirMedico(${medico.id})">Excluir</button>`
             : '—';
         return `
             <tr>
                 <td>${esc(medico.nome)}</td>
                 <td>${esc(medico.crm)}</td>
                 <td>${esc(medico.especialidade)}</td>
-                <td><div class="actions">${acoes}</div></td>
+                <td><div class="acoes-linha">${acoes}</div></td>
             </tr>
         `;
     }).join('');
@@ -573,17 +539,15 @@ function mostrarAgendamentos() {
         let acoes = '';
 
         if (agendamento.situacao === 'AGENDADO') {
-            acoes += `<button class="btn btn-secondary btn-sm" onclick="alterarSituacao(${agendamento.id}, 'CONFIRMADO')">Confirmar</button>`;
+            acoes += `<button class="botao botao--secundario botao--pequeno" onclick="alterarSituacao(${agendamento.id}, 'CONFIRMADO')">Confirmar</button>`;
         }
         if (aberto && podeVerDadoClinico()) {
-            acoes += `<button class="btn btn-primary btn-sm" onclick="atenderAgendamento(${agendamento.id})">Atender</button>`;
+            acoes += `<button class="botao botao--primario botao--pequeno" onclick="atenderAgendamento(${agendamento.id})">Atender</button>`;
         }
         if (aberto) {
-            acoes += `<button class="btn btn-secondary btn-sm" onclick="alterarSituacao(${agendamento.id}, 'AUSENTE')">Faltou</button>
-                      <button class="btn btn-danger-soft btn-sm" onclick="alterarSituacao(${agendamento.id}, 'CANCELADO')">Cancelar</button>`;
+            acoes += `<button class="botao botao--secundario botao--pequeno" onclick="alterarSituacao(${agendamento.id}, 'AUSENTE')">Faltou</button>
+                      <button class="botao botao--perigo botao--pequeno" onclick="alterarSituacao(${agendamento.id}, 'CANCELADO')">Cancelar</button>`;
         }
-
-        const selo = SELOS_SITUACAO[agendamento.situacao] || 'badge-neutral';
 
         return `
             <tr>
@@ -591,8 +555,8 @@ function mostrarAgendamentos() {
                 <td>${esc(agendamento.horario)}</td>
                 <td>${esc(agendamento.paciente.nome)}</td>
                 <td>${esc(agendamento.medico.nome)} (${esc(agendamento.medico.especialidade)})</td>
-                <td><span class="badge ${selo}">${esc(agendamento.situacao)}</span></td>
-                <td><div class="actions">${acoes || '—'}</div></td>
+                <td><span class="selo selo--${esc(agendamento.situacao)}">${esc(agendamento.situacao)}</span></td>
+                <td><div class="acoes-linha">${acoes || '—'}</div></td>
             </tr>
         `;
     }).join('');
@@ -665,7 +629,7 @@ function mostrarConsultas() {
             <td>${esc(consulta.paciente.nome)}</td>
             <td>${esc(consulta.medico.nome)}</td>
             <td>${esc(consulta.queixaPrincipal)}</td>
-            <td><div class="actions"><button class="btn btn-secondary btn-sm" onclick="editarConsulta(${consulta.id})">Editar</button></div></td>
+            <td><div class="acoes-linha"><button class="botao botao--secundario botao--pequeno" onclick="editarConsulta(${consulta.id})">Editar</button></div></td>
         </tr>
     `).join('');
 }
@@ -772,8 +736,8 @@ async function mostrarProntuario(pacienteId) {
 
     const historico = prontuario.consultas.length === 0
         ? '<p class="vazio">Este paciente ainda não possui consultas.</p>'
-        : `<div class="form">${prontuario.consultas.map(consulta => `
-            <article class="prontuario-item">
+        : prontuario.consultas.map(consulta => `
+            <article class="item-prontuario">
                 <h3>${esc(formatarData(consulta.data))} às ${esc(consulta.horario)} —
                     ${esc(consulta.medico.nome)} (${esc(consulta.medico.especialidade)})</h3>
                 <p><strong>Queixa:</strong> ${esc(consulta.queixaPrincipal)}</p>
@@ -781,28 +745,28 @@ async function mostrarProntuario(pacienteId) {
                 <p><strong>Conduta:</strong> ${esc(consulta.conduta)}</p>
                 <p><strong>Observações:</strong> ${esc(consulta.observacoesMedicas)}</p>
             </article>
-        `).join('')}</div>`;
+        `).join('<div style="height:12px"></div>');
 
     destino.innerHTML = `
-        <div class="card">
-            <div class="card-header"><span class="card-title">Prontuário de ${esc(paciente.nome)}</span></div>
-            <div class="card-body">
-                <div class="kv-grid">
-                    <div><p class="kv-label">Nome</p><p class="kv-value">${esc(paciente.nome)}</p></div>
-                    <div><p class="kv-label">CPF</p><p class="kv-value">${esc(formatarCpf(paciente.cpf))}</p></div>
-                    <div><p class="kv-label">Convênio</p><p class="kv-value">${esc(paciente.convenio)}</p></div>
-                    <div><p class="kv-label">Alergias</p><p class="kv-value">${esc(paciente.alergias)}</p></div>
+        <div class="cartao">
+            <div class="cartao-cabecalho"><h2 class="cartao-titulo">Prontuário de ${esc(paciente.nome)}</h2></div>
+            <div class="cartao-corpo">
+                <div class="grade-ficha">
+                    <div><p class="ficha-rotulo">Nome</p><p class="ficha-valor">${esc(paciente.nome)}</p></div>
+                    <div><p class="ficha-rotulo">CPF</p><p class="ficha-valor">${esc(formatarCpf(paciente.cpf))}</p></div>
+                    <div><p class="ficha-rotulo">Convênio</p><p class="ficha-valor">${esc(paciente.convenio)}</p></div>
+                    <div><p class="ficha-rotulo">Alergias</p><p class="ficha-valor">${esc(paciente.alergias)}</p></div>
                 </div>
-                <p class="kv-label" style="margin-top:18px">Anotações gerais</p>
-                <p class="kv-value">${esc(paciente.prontuario)}</p>
+                <p class="ficha-rotulo" style="margin-top:18px">Anotações gerais</p>
+                <p class="ficha-valor">${esc(paciente.prontuario)}</p>
             </div>
         </div>
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">Histórico de consultas</span>
-                <span class="badge badge-neutral">${prontuario.totalConsultas}</span>
+        <div class="cartao">
+            <div class="cartao-cabecalho">
+                <h2 class="cartao-titulo">Histórico de consultas</h2>
+                <span class="selo selo--neutro">${prontuario.totalConsultas}</span>
             </div>
-            <div class="card-body">${historico}</div>
+            <div class="cartao-corpo">${historico}</div>
         </div>
     `;
 }
@@ -828,13 +792,13 @@ function mostrarUsuarios() {
         const ehVoce = sessao.usuario && usuario.id === sessao.usuario.id;
         const excluir = ehVoce
             ? ''
-            : `<button class="btn btn-danger-soft btn-sm" onclick="excluirUsuario(${usuario.id})">Excluir</button>`;
+            : `<button class="botao botao--perigo botao--pequeno" onclick="excluirUsuario(${usuario.id})">Excluir</button>`;
         return `
             <tr>
-                <td>${esc(usuario.nome)}${ehVoce ? ' <span class="badge badge-neutral">você</span>' : ''}</td>
+                <td>${esc(usuario.nome)}${ehVoce ? ' <span class="selo selo--neutro">você</span>' : ''}</td>
                 <td>${esc(usuario.email)}</td>
                 <td>${esc(PERFIS[usuario.perfil] || usuario.perfil)}</td>
-                <td><div class="actions"><button class="btn btn-secondary btn-sm" onclick="editarUsuario(${usuario.id})">Editar</button>${excluir}</div></td>
+                <td><div class="acoes-linha"><button class="botao botao--secundario botao--pequeno" onclick="editarUsuario(${usuario.id})">Editar</button>${excluir}</div></td>
             </tr>
         `;
     }).join('');
@@ -945,11 +909,17 @@ async function trocarSenha(evento) {
 /* ============================== INÍCIO =============================== */
 
 async function iniciar() {
-    montarIcones();
-
     // Navegação da sidebar
     document.querySelectorAll('.nav-item[data-painel]').forEach(botao => {
         botao.addEventListener('click', () => trocarAba(botao.dataset.painel));
+    });
+
+    // Menu mobile (a sidebar fica fora da tela em telas estreitas)
+    document.getElementById('botao-menu-mobile').addEventListener('click', () => {
+        document.getElementById('aplicacao').classList.add('menu-aberto');
+    });
+    document.getElementById('overlay-mobile').addEventListener('click', () => {
+        document.getElementById('aplicacao').classList.remove('menu-aberto');
     });
 
     // Formulários

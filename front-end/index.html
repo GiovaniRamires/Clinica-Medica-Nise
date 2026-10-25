@@ -8,136 +8,151 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ======================== TELA DE LOGIN ========================= -->
-<!-- Mostrada enquanto não há token válido; o resto da aplicação fica oculto. -->
-<div id="tela-login" class="auth">
-    <div class="auth-box">
-        <span class="auth-brand"><span class="brand-logo">C</span><span class="brand-name">Clínica Nise</span></span>
-        <h1>Entrar no sistema</h1>
-        <p class="auth-sub">Use suas credenciais para acessar o prontuário e a agenda.</p>
+<!-- ======================== TELA DE LOGIN =========================
+     Fiel ao Login.tsx do protótipo Figma: card centralizado com o logo,
+     título, campos com borda #d1d5db e botão azul #1d4ed8. -->
+<div id="tela-login" class="tela-login">
+    <div class="login-caixa">
+        <div class="login-logo">
+            <span class="logo-marca logo-marca--grande">C</span>
+            <span class="login-nome-marca">Clínica Nise</span>
+        </div>
+        <h1 class="login-titulo">Entrar no sistema</h1>
+        <p class="login-subtitulo">Use suas credenciais para acessar o prontuário e a agenda.</p>
 
-        <form id="form-login" class="auth-card form" novalidate>
-            <div class="field">
-                <label class="label" for="login-email">E-mail</label>
-                <input class="input" id="login-email" name="email" type="email" autocomplete="username" required autofocus>
-                <div class="field-error"></div>
-            </div>
-            <div class="field">
-                <label class="label" for="login-senha">Senha</label>
-                <input class="input" id="login-senha" name="senha" type="password" autocomplete="current-password" required>
-                <div class="field-error"></div>
-            </div>
-            <button type="submit" class="btn btn-primary btn-block" style="height:43px;font-size:14px">Entrar</button>
-            <p id="erro-login" class="callout callout-danger oculto" role="alert"></p>
-        </form>
+        <div class="login-card">
+            <form id="form-login" novalidate>
+                <div class="campo">
+                    <label class="rotulo" for="login-email">E-mail</label>
+                    <input class="entrada" id="login-email" name="email" type="email" autocomplete="username" required autofocus>
+                    <p class="erro-campo oculto"></p>
+                </div>
+                <div class="campo">
+                    <label class="rotulo" for="login-senha">Senha</label>
+                    <input class="entrada" id="login-senha" name="senha" type="password" autocomplete="current-password" placeholder="••••••••" required>
+                    <p class="erro-campo oculto"></p>
+                </div>
+                <button type="submit" class="botao-entrar">Entrar</button>
+                <p id="erro-login" class="mensagem-erro oculto" role="alert"></p>
+            </form>
+        </div>
 
-        <div class="auth-foot">
-            <span data-icon="lock"></span> Acesso restrito à equipe da clínica
+        <div class="login-rodape">
+            <span>🔒 Acesso restrito à equipe da clínica</span>
         </div>
     </div>
 </div>
 
-<!-- ======================== APLICAÇÃO ============================= -->
-<div id="aplicacao" class="app oculto">
+<!-- ======================== APLICAÇÃO =============================
+     Layout.tsx: sidebar fixa (240px) + header com saudação, sino e avatar. -->
+<div id="aplicacao" class="app-shell oculto">
 
-    <aside class="sidebar">
-        <div class="brand"><span class="brand-logo">C</span><span class="brand-name">Clínica Nise</span></div>
-        <nav class="nav">
-            <p class="nav-label">Atendimento</p>
-            <button class="nav-item active" data-painel="pacientes"><span data-icon="users"></span><span>Pacientes</span></button>
-            <button class="nav-item" data-painel="medicos"><span data-icon="userPlus"></span><span>Médicos</span></button>
-            <button class="nav-item" data-painel="agenda"><span data-icon="calendar"></span><span>Agenda</span></button>
-            <button class="nav-item" data-painel="consultas" data-perfil="MEDICO,ADMINISTRADOR"><span data-icon="clipboard"></span><span>Consultas</span></button>
-            <button class="nav-item" data-painel="prontuario" data-perfil="MEDICO,ADMINISTRADOR"><span data-icon="book"></span><span>Prontuário</span></button>
-            <p class="nav-label" data-perfil="ADMINISTRADOR">Administração</p>
-            <button class="nav-item" data-painel="usuarios" data-perfil="ADMINISTRADOR"><span data-icon="shield"></span><span>Usuários</span></button>
+    <div class="overlay-mobile" id="overlay-mobile"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <span class="logo-marca">C</span>
+            <span class="sidebar-nome-marca">Clínica Nise</span>
+        </div>
+
+        <nav class="sidebar-nav">
+            <p class="nav-rotulo">Atendimento</p>
+            <button class="nav-item active" data-painel="pacientes"><span class="nav-icone">▦</span><span>Pacientes</span></button>
+            <button class="nav-item" data-painel="medicos"><span class="nav-icone">◎</span><span>Médicos</span></button>
+            <button class="nav-item" data-painel="agenda"><span class="nav-icone">≡</span><span>Agenda</span></button>
+            <button class="nav-item" data-painel="consultas" data-perfil="MEDICO,ADMINISTRADOR"><span class="nav-icone">▣</span><span>Consultas</span></button>
+            <button class="nav-item" data-painel="prontuario" data-perfil="MEDICO,ADMINISTRADOR"><span class="nav-icone">▤</span><span>Prontuário</span></button>
+            <p class="nav-rotulo" data-perfil="ADMINISTRADOR">Administração</p>
+            <button class="nav-item" data-painel="usuarios" data-perfil="ADMINISTRADOR"><span class="nav-icone">◉</span><span>Usuários</span></button>
         </nav>
-        <div class="nav-footer">
-            <button class="nav-item" data-painel="conta"><span data-icon="user"></span><span>Minha conta</span></button>
-            <button class="nav-item danger" id="botao-sair"><span data-icon="logout"></span><span>Sair</span></button>
+
+        <div class="sidebar-rodape">
+            <button class="nav-item" data-painel="conta"><span class="nav-icone">⚙</span><span>Minha conta</span></button>
+            <button class="nav-item nav-item--sair" id="botao-sair"><span class="nav-icone">⎋</span><span>Sair</span></button>
         </div>
     </aside>
 
-    <div class="main">
-        <header class="topbar">
-            <span class="topbar-title" id="titulo-painel">Pacientes</span>
-            <div class="topbar-actions">
-                <span class="user-chip">
-                    <span class="user-chip-text">
-                        <span class="user-chip-name" id="usuario-nome"></span>
-                        <span class="user-chip-role" id="usuario-perfil"></span>
-                    </span>
-                    <span class="avatar" id="usuario-avatar"></span>
-                </span>
+    <div class="area-principal">
+        <header class="topo">
+            <div class="topo-esquerda">
+                <button class="botao-menu-mobile" id="botao-menu-mobile">☰</button>
+                <div>
+                    <span class="saudacao-prefixo">Olá, </span>
+                    <span class="saudacao-nome" id="saudacao-nome"></span>
+                </div>
+            </div>
+            <div class="topo-direita">
+                <button class="botao-sino" aria-label="Notificações">🔔</button>
+                <div class="avatar" id="usuario-avatar"></div>
             </div>
         </header>
 
-        <main class="content">
+        <main class="conteudo">
 
             <!-- ========================== PACIENTES ========================== -->
-            <section class="view" id="painel-pacientes">
-                <div class="card">
-                    <div class="card-header"><span class="card-title" id="titulo-form-paciente">Novo paciente</span></div>
-                    <div class="card-body">
-                        <form id="form-paciente" class="form" novalidate>
+            <section class="pagina" id="painel-pacientes">
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo" id="titulo-form-paciente">Novo paciente</h2>
+                    </div>
+                    <div class="cartao-corpo">
+                        <form id="form-paciente" novalidate>
                             <input type="hidden" name="id">
-                            <div class="form-grid">
-                                <div class="field">
-                                    <label class="label" for="pac-nome">Nome<span class="req">*</span></label>
-                                    <input class="input" id="pac-nome" name="nome" maxlength="120" required autocomplete="off">
-                                    <div class="field-error"></div>
+                            <div class="grade-campos">
+                                <div class="campo">
+                                    <label class="rotulo" for="pac-nome">Nome</label>
+                                    <input class="entrada" id="pac-nome" name="nome" maxlength="120" required autocomplete="off">
+                                    <p class="erro-campo oculto"></p>
                                 </div>
-                                <div class="field">
-                                    <label class="label" for="pac-cpf">CPF<span class="req">*</span></label>
-                                    <input class="input" id="pac-cpf" name="cpf" inputmode="numeric" maxlength="11" required autocomplete="off">
-                                    <p class="hint">11 dígitos, só números</p>
-                                    <div class="field-error"></div>
+                                <div class="campo">
+                                    <label class="rotulo" for="pac-cpf">CPF</label>
+                                    <input class="entrada" id="pac-cpf" name="cpf" inputmode="numeric" maxlength="11" required autocomplete="off" placeholder="11 dígitos, só números">
+                                    <p class="erro-campo oculto"></p>
                                 </div>
-                                <div class="field">
-                                    <label class="label" for="pac-convenio">Convênio</label>
-                                    <input class="input" id="pac-convenio" name="convenio" maxlength="80" autocomplete="off">
-                                    <div class="field-error"></div>
+                                <div class="campo">
+                                    <label class="rotulo" for="pac-convenio">Convênio</label>
+                                    <input class="entrada" id="pac-convenio" name="convenio" maxlength="80" autocomplete="off">
+                                    <p class="erro-campo oculto"></p>
                                 </div>
                             </div>
-                            <div class="field" data-perfil="MEDICO,ADMINISTRADOR">
-                                <label class="label" for="pac-alergias">Alergias</label>
-                                <textarea class="textarea" id="pac-alergias" name="alergias" rows="2" maxlength="500"></textarea>
-                                <div class="field-error"></div>
+                            <div class="campo" data-perfil="MEDICO,ADMINISTRADOR">
+                                <label class="rotulo" for="pac-alergias">Alergias</label>
+                                <textarea class="entrada entrada--area" id="pac-alergias" name="alergias" rows="2" maxlength="500"></textarea>
+                                <p class="erro-campo oculto"></p>
                             </div>
-                            <div class="field" data-perfil="MEDICO,ADMINISTRADOR">
-                                <label class="label" for="pac-prontuario">Prontuário</label>
-                                <textarea class="textarea" id="pac-prontuario" name="prontuario" rows="3" maxlength="2000"></textarea>
-                                <p class="hint">Histórico e anotações gerais</p>
-                                <div class="field-error"></div>
+                            <div class="campo" data-perfil="MEDICO,ADMINISTRADOR">
+                                <label class="rotulo" for="pac-prontuario">Prontuário</label>
+                                <textarea class="entrada entrada--area" id="pac-prontuario" name="prontuario" rows="3" maxlength="2000" placeholder="Histórico e anotações gerais"></textarea>
+                                <p class="erro-campo oculto"></p>
                             </div>
-                            <div class="row">
-                                <button type="submit" class="btn btn-primary">Salvar paciente</button>
-                                <button type="button" id="cancelar-paciente" class="btn btn-secondary oculto">Cancelar edição</button>
+                            <div class="linha-acoes">
+                                <button type="submit" class="botao botao--primario">Salvar paciente</button>
+                                <button type="button" id="cancelar-paciente" class="botao botao--secundario oculto">Cancelar edição</button>
                             </div>
                         </form>
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Pacientes cadastrados</span>
-                        <span class="badge badge-neutral" id="contador-pacientes"></span>
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Pacientes cadastrados</h2>
+                        <span class="selo selo--neutro" id="contador-pacientes"></span>
                     </div>
-                    <div class="table-wrap">
-                        <table class="table">
+                    <div class="tabela-scroll">
+                        <table class="tabela">
                             <thead>
                             <tr>
                                 <th>Nome</th>
                                 <th>CPF</th>
                                 <th>Convênio</th>
                                 <th data-perfil="MEDICO,ADMINISTRADOR">Alergias</th>
-                                <th class="right">Ações</th>
+                                <th class="col-direita">Ações</th>
                             </tr>
                             </thead>
                             <tbody id="tabela-pacientes"></tbody>
@@ -147,51 +162,52 @@
             </section>
 
             <!-- =========================== MÉDICOS =========================== -->
-            <section class="view oculto" id="painel-medicos">
-                <div class="card" data-perfil="ADMINISTRADOR">
-                    <div class="card-header"><span class="card-title" id="titulo-form-medico">Novo médico</span></div>
-                    <div class="card-body">
-                        <form id="form-medico" class="form" novalidate>
+            <section class="pagina oculto" id="painel-medicos">
+                <div class="cartao" data-perfil="ADMINISTRADOR">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo" id="titulo-form-medico">Novo médico</h2>
+                    </div>
+                    <div class="cartao-corpo">
+                        <form id="form-medico" novalidate>
                             <input type="hidden" name="id">
-                            <div class="form-grid">
-                                <div class="field">
-                                    <label class="label" for="med-nome">Nome<span class="req">*</span></label>
-                                    <input class="input" id="med-nome" name="nome" maxlength="120" required autocomplete="off">
-                                    <div class="field-error"></div>
+                            <div class="grade-campos">
+                                <div class="campo">
+                                    <label class="rotulo" for="med-nome">Nome</label>
+                                    <input class="entrada" id="med-nome" name="nome" maxlength="120" required autocomplete="off">
+                                    <p class="erro-campo oculto"></p>
                                 </div>
-                                <div class="field">
-                                    <label class="label" for="med-crm">CRM<span class="req">*</span></label>
-                                    <input class="input" id="med-crm" name="crm" maxlength="10" required autocomplete="off">
-                                    <p class="hint">Ex: 123456 ou 123456/SP</p>
-                                    <div class="field-error"></div>
+                                <div class="campo">
+                                    <label class="rotulo" for="med-crm">CRM</label>
+                                    <input class="entrada" id="med-crm" name="crm" maxlength="10" required autocomplete="off" placeholder="Ex: 123456 ou 123456/SP">
+                                    <p class="erro-campo oculto"></p>
                                 </div>
-                                <div class="field">
-                                    <label class="label" for="med-especialidade">Especialidade<span class="req">*</span></label>
-                                    <input class="input" id="med-especialidade" name="especialidade" maxlength="80" required autocomplete="off">
-                                    <div class="field-error"></div>
+                                <div class="campo">
+                                    <label class="rotulo" for="med-especialidade">Especialidade</label>
+                                    <input class="entrada" id="med-especialidade" name="especialidade" maxlength="80" required autocomplete="off">
+                                    <p class="erro-campo oculto"></p>
                                 </div>
                             </div>
-                            <div class="row">
-                                <button type="submit" class="btn btn-primary">Salvar médico</button>
-                                <button type="button" id="cancelar-medico" class="btn btn-secondary oculto">Cancelar edição</button>
+                            <div class="linha-acoes">
+                                <button type="submit" class="botao botao--primario">Salvar médico</button>
+                                <button type="button" id="cancelar-medico" class="botao botao--secundario oculto">Cancelar edição</button>
                             </div>
                         </form>
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Médicos cadastrados</span>
-                        <span class="badge badge-neutral" id="contador-medicos"></span>
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Médicos cadastrados</h2>
+                        <span class="selo selo--neutro" id="contador-medicos"></span>
                     </div>
-                    <div class="table-wrap">
-                        <table class="table">
+                    <div class="tabela-scroll">
+                        <table class="tabela">
                             <thead>
                             <tr>
                                 <th>Nome</th>
                                 <th>CRM</th>
                                 <th>Especialidade</th>
-                                <th class="right">Ações</th>
+                                <th class="col-direita">Ações</th>
                             </tr>
                             </thead>
                             <tbody id="tabela-medicos"></tbody>
@@ -201,54 +217,56 @@
             </section>
 
             <!-- ============================ AGENDA =========================== -->
-            <section class="view oculto" id="painel-agenda">
-                <div class="card">
-                    <div class="card-header"><span class="card-title">Novo agendamento</span></div>
-                    <div class="card-body">
-                        <form id="form-agendamento" class="form" novalidate>
-                            <div class="form-grid">
-                                <div class="field">
-                                    <label class="label" for="age-paciente">Paciente<span class="req">*</span></label>
-                                    <select class="select" id="age-paciente" name="pacienteId" required></select>
-                                    <div class="field-error"></div>
+            <section class="pagina oculto" id="painel-agenda">
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Novo agendamento</h2>
+                    </div>
+                    <div class="cartao-corpo">
+                        <form id="form-agendamento" novalidate>
+                            <div class="grade-campos">
+                                <div class="campo">
+                                    <label class="rotulo" for="age-paciente">Paciente</label>
+                                    <select class="entrada entrada--select" id="age-paciente" name="pacienteId" required></select>
+                                    <p class="erro-campo oculto"></p>
                                 </div>
-                                <div class="field">
-                                    <label class="label" for="age-medico">Médico<span class="req">*</span></label>
-                                    <select class="select" id="age-medico" name="medicoId" required></select>
-                                    <div class="field-error"></div>
-                                </div>
-                            </div>
-                            <div class="form-grid">
-                                <div class="field">
-                                    <label class="label" for="age-data">Data<span class="req">*</span></label>
-                                    <input class="input" type="date" id="age-data" name="data" required>
-                                    <div class="field-error"></div>
-                                </div>
-                                <div class="field">
-                                    <label class="label" for="age-horario">Horário<span class="req">*</span></label>
-                                    <input class="input" type="time" id="age-horario" name="horario" required>
-                                    <div class="field-error"></div>
+                                <div class="campo">
+                                    <label class="rotulo" for="age-medico">Médico</label>
+                                    <select class="entrada entrada--select" id="age-medico" name="medicoId" required></select>
+                                    <p class="erro-campo oculto"></p>
                                 </div>
                             </div>
-                            <div class="field">
-                                <label class="label" for="age-observacoes">Observações</label>
-                                <textarea class="textarea" id="age-observacoes" name="observacoes" rows="2" maxlength="500"></textarea>
-                                <div class="field-error"></div>
+                            <div class="grade-campos">
+                                <div class="campo">
+                                    <label class="rotulo" for="age-data">Data</label>
+                                    <input class="entrada" type="date" id="age-data" name="data" required>
+                                    <p class="erro-campo oculto"></p>
+                                </div>
+                                <div class="campo">
+                                    <label class="rotulo" for="age-horario">Horário</label>
+                                    <input class="entrada" type="time" id="age-horario" name="horario" required>
+                                    <p class="erro-campo oculto"></p>
+                                </div>
                             </div>
-                            <div class="row">
-                                <button type="submit" class="btn btn-primary">Agendar</button>
+                            <div class="campo">
+                                <label class="rotulo" for="age-observacoes">Observações</label>
+                                <textarea class="entrada entrada--area" id="age-observacoes" name="observacoes" rows="2" maxlength="500"></textarea>
+                                <p class="erro-campo oculto"></p>
+                            </div>
+                            <div class="linha-acoes">
+                                <button type="submit" class="botao botao--primario">Agendar</button>
                             </div>
                         </form>
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Agenda</span>
-                        <span class="badge badge-neutral" id="contador-agendamentos"></span>
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Agenda</h2>
+                        <span class="selo selo--neutro" id="contador-agendamentos"></span>
                     </div>
-                    <div class="table-wrap">
-                        <table class="table">
+                    <div class="tabela-scroll">
+                        <table class="tabela">
                             <thead>
                             <tr>
                                 <th>Data</th>
@@ -256,7 +274,7 @@
                                 <th>Paciente</th>
                                 <th>Médico</th>
                                 <th>Situação</th>
-                                <th class="right">Ações</th>
+                                <th class="col-direita">Ações</th>
                             </tr>
                             </thead>
                             <tbody id="tabela-agendamentos"></tbody>
@@ -266,55 +284,57 @@
             </section>
 
             <!-- =========================== CONSULTAS ========================= -->
-            <section class="view oculto" id="painel-consultas">
-                <div class="card">
-                    <div class="card-header"><span class="card-title" id="titulo-form-consulta">Registrar atendimento</span></div>
-                    <div class="card-body">
-                        <form id="form-consulta" class="form" novalidate>
+            <section class="pagina oculto" id="painel-consultas">
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo" id="titulo-form-consulta">Registrar atendimento</h2>
+                    </div>
+                    <div class="cartao-corpo">
+                        <form id="form-consulta" novalidate>
                             <input type="hidden" name="id">
-                            <div class="field" id="campo-agendamento">
-                                <label class="label" for="con-agendamento">Agendamento<span class="req">*</span></label>
-                                <select class="select" id="con-agendamento" name="agendamentoId" required></select>
-                                <p class="hint">Só aparecem agendamentos ainda não atendidos</p>
-                                <div class="field-error"></div>
+                            <div class="campo" id="campo-agendamento">
+                                <label class="rotulo" for="con-agendamento">Agendamento</label>
+                                <select class="entrada entrada--select" id="con-agendamento" name="agendamentoId" required></select>
+                                <p class="dica">Só aparecem agendamentos ainda não atendidos</p>
+                                <p class="erro-campo oculto"></p>
                             </div>
-                            <div class="field">
-                                <label class="label" for="con-queixa">Queixa principal<span class="req">*</span></label>
-                                <textarea class="textarea" id="con-queixa" name="queixaPrincipal" rows="2" maxlength="500" required></textarea>
-                                <div class="field-error"></div>
+                            <div class="campo">
+                                <label class="rotulo" for="con-queixa">Queixa principal</label>
+                                <textarea class="entrada entrada--area" id="con-queixa" name="queixaPrincipal" rows="2" maxlength="500" required></textarea>
+                                <p class="erro-campo oculto"></p>
                             </div>
-                            <div class="form-grid">
-                                <div class="field">
-                                    <label class="label" for="con-diagnostico">Diagnóstico</label>
-                                    <textarea class="textarea" id="con-diagnostico" name="diagnostico" rows="3" maxlength="2000"></textarea>
-                                    <div class="field-error"></div>
+                            <div class="grade-campos">
+                                <div class="campo">
+                                    <label class="rotulo" for="con-diagnostico">Diagnóstico</label>
+                                    <textarea class="entrada entrada--area" id="con-diagnostico" name="diagnostico" rows="3" maxlength="2000"></textarea>
+                                    <p class="erro-campo oculto"></p>
                                 </div>
-                                <div class="field">
-                                    <label class="label" for="con-conduta">Conduta</label>
-                                    <textarea class="textarea" id="con-conduta" name="conduta" rows="3" maxlength="2000"></textarea>
-                                    <div class="field-error"></div>
+                                <div class="campo">
+                                    <label class="rotulo" for="con-conduta">Conduta</label>
+                                    <textarea class="entrada entrada--area" id="con-conduta" name="conduta" rows="3" maxlength="2000"></textarea>
+                                    <p class="erro-campo oculto"></p>
                                 </div>
                             </div>
-                            <div class="field">
-                                <label class="label" for="con-observacoes">Observações médicas</label>
-                                <textarea class="textarea" id="con-observacoes" name="observacoesMedicas" rows="3" maxlength="2000"></textarea>
-                                <div class="field-error"></div>
+                            <div class="campo">
+                                <label class="rotulo" for="con-observacoes">Observações médicas</label>
+                                <textarea class="entrada entrada--area" id="con-observacoes" name="observacoesMedicas" rows="3" maxlength="2000"></textarea>
+                                <p class="erro-campo oculto"></p>
                             </div>
-                            <div class="row">
-                                <button type="submit" class="btn btn-primary">Salvar consulta</button>
-                                <button type="button" id="cancelar-consulta" class="btn btn-secondary oculto">Cancelar edição</button>
+                            <div class="linha-acoes">
+                                <button type="submit" class="botao botao--primario">Salvar consulta</button>
+                                <button type="button" id="cancelar-consulta" class="botao botao--secundario oculto">Cancelar edição</button>
                             </div>
                         </form>
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Consultas registradas</span>
-                        <span class="badge badge-neutral" id="contador-consultas"></span>
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Consultas registradas</h2>
+                        <span class="selo selo--neutro" id="contador-consultas"></span>
                     </div>
-                    <div class="table-wrap">
-                        <table class="table">
+                    <div class="tabela-scroll">
+                        <table class="tabela">
                             <thead>
                             <tr>
                                 <th>Data</th>
@@ -322,7 +342,7 @@
                                 <th>Paciente</th>
                                 <th>Médico</th>
                                 <th>Queixa</th>
-                                <th class="right">Ações</th>
+                                <th class="col-direita">Ações</th>
                             </tr>
                             </thead>
                             <tbody id="tabela-consultas"></tbody>
@@ -332,13 +352,15 @@
             </section>
 
             <!-- ========================== PRONTUÁRIO ========================= -->
-            <section class="view oculto" id="painel-prontuario">
-                <div class="card">
-                    <div class="card-header"><span class="card-title">Consultar prontuário</span></div>
-                    <div class="card-body">
-                        <div class="field" style="max-width:420px">
-                            <label class="label" for="select-prontuario">Paciente</label>
-                            <select class="select" id="select-prontuario"></select>
+            <section class="pagina oculto" id="painel-prontuario">
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Consultar prontuário</h2>
+                    </div>
+                    <div class="cartao-corpo">
+                        <div class="campo" style="max-width:420px">
+                            <label class="rotulo" for="select-prontuario">Paciente</label>
+                            <select class="entrada entrada--select" id="select-prontuario"></select>
                         </div>
                     </div>
                 </div>
@@ -346,61 +368,62 @@
             </section>
 
             <!-- =========================== USUÁRIOS ========================== -->
-            <section class="view oculto" id="painel-usuarios">
-                <div class="card">
-                    <div class="card-header"><span class="card-title" id="titulo-form-usuario">Novo usuário</span></div>
-                    <div class="card-body">
-                        <form id="form-usuario" class="form" novalidate>
+            <section class="pagina oculto" id="painel-usuarios">
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo" id="titulo-form-usuario">Novo usuário</h2>
+                    </div>
+                    <div class="cartao-corpo">
+                        <form id="form-usuario" novalidate>
                             <input type="hidden" name="id">
-                            <div class="form-grid">
-                                <div class="field">
-                                    <label class="label" for="usu-nome">Nome<span class="req">*</span></label>
-                                    <input class="input" id="usu-nome" name="nome" maxlength="120" required autocomplete="off">
-                                    <div class="field-error"></div>
+                            <div class="grade-campos">
+                                <div class="campo">
+                                    <label class="rotulo" for="usu-nome">Nome</label>
+                                    <input class="entrada" id="usu-nome" name="nome" maxlength="120" required autocomplete="off">
+                                    <p class="erro-campo oculto"></p>
                                 </div>
-                                <div class="field">
-                                    <label class="label" for="usu-email">E-mail<span class="req">*</span></label>
-                                    <input class="input" type="email" id="usu-email" name="email" maxlength="120" required autocomplete="off">
-                                    <div class="field-error"></div>
+                                <div class="campo">
+                                    <label class="rotulo" for="usu-email">E-mail</label>
+                                    <input class="entrada" type="email" id="usu-email" name="email" maxlength="120" required autocomplete="off">
+                                    <p class="erro-campo oculto"></p>
                                 </div>
-                                <div class="field">
-                                    <label class="label" for="usu-perfil">Perfil<span class="req">*</span></label>
-                                    <select class="select" id="usu-perfil" name="perfil" required>
+                                <div class="campo">
+                                    <label class="rotulo" for="usu-perfil">Perfil</label>
+                                    <select class="entrada entrada--select" id="usu-perfil" name="perfil" required>
                                         <option value="">Selecione…</option>
                                         <option value="RECEPCIONISTA">Recepcionista</option>
                                         <option value="MEDICO">Médico</option>
                                         <option value="ADMINISTRADOR">Administrador</option>
                                     </select>
-                                    <div class="field-error"></div>
+                                    <p class="erro-campo oculto"></p>
                                 </div>
                             </div>
-                            <div class="field" id="campo-senha-usuario">
-                                <label class="label" for="usu-senha">Senha<span class="req">*</span></label>
-                                <input class="input" type="password" id="usu-senha" name="senha" minlength="8" maxlength="72" required autocomplete="new-password">
-                                <p class="hint">Mínimo 8 caracteres</p>
-                                <div class="field-error"></div>
+                            <div class="campo" id="campo-senha-usuario">
+                                <label class="rotulo" for="usu-senha">Senha</label>
+                                <input class="entrada" type="password" id="usu-senha" name="senha" minlength="8" maxlength="72" required autocomplete="new-password" placeholder="Mínimo 8 caracteres">
+                                <p class="erro-campo oculto"></p>
                             </div>
-                            <div class="row">
-                                <button type="submit" class="btn btn-primary">Salvar usuário</button>
-                                <button type="button" id="cancelar-usuario" class="btn btn-secondary oculto">Cancelar edição</button>
+                            <div class="linha-acoes">
+                                <button type="submit" class="botao botao--primario">Salvar usuário</button>
+                                <button type="button" id="cancelar-usuario" class="botao botao--secundario oculto">Cancelar edição</button>
                             </div>
                         </form>
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Usuários do sistema</span>
-                        <span class="badge badge-neutral" id="contador-usuarios"></span>
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Usuários do sistema</h2>
+                        <span class="selo selo--neutro" id="contador-usuarios"></span>
                     </div>
-                    <div class="table-wrap">
-                        <table class="table">
+                    <div class="tabela-scroll">
+                        <table class="tabela">
                             <thead>
                             <tr>
                                 <th>Nome</th>
                                 <th>E-mail</th>
                                 <th>Perfil</th>
-                                <th class="right">Ações</th>
+                                <th class="col-direita">Ações</th>
                             </tr>
                             </thead>
                             <tbody id="tabela-usuarios"></tbody>
@@ -410,33 +433,32 @@
             </section>
 
             <!-- ========================== MINHA CONTA ======================== -->
-            <section class="view oculto" id="painel-conta">
-                <div class="card">
-                    <div class="card-header"><span class="card-title">Meus dados</span></div>
-                    <div class="card-body">
-                        <div class="kv-grid" id="ficha-conta"></div>
+            <section class="pagina oculto" id="painel-conta">
+                <div class="cartao">
+                    <div class="cartao-cabecalho"><h2 class="cartao-titulo">Meus dados</h2></div>
+                    <div class="cartao-corpo">
+                        <div class="grade-ficha" id="ficha-conta"></div>
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header"><span class="card-title">Trocar senha</span></div>
-                    <div class="card-body">
-                        <form id="form-senha" class="form" novalidate>
-                            <div class="form-grid">
-                                <div class="field">
-                                    <label class="label" for="senha-atual">Senha atual<span class="req">*</span></label>
-                                    <input class="input" type="password" id="senha-atual" name="senhaAtual" required autocomplete="current-password">
-                                    <div class="field-error"></div>
+                <div class="cartao">
+                    <div class="cartao-cabecalho"><h2 class="cartao-titulo">Trocar senha</h2></div>
+                    <div class="cartao-corpo">
+                        <form id="form-senha" novalidate>
+                            <div class="grade-campos">
+                                <div class="campo">
+                                    <label class="rotulo" for="senha-atual">Senha atual</label>
+                                    <input class="entrada" type="password" id="senha-atual" name="senhaAtual" required autocomplete="current-password">
+                                    <p class="erro-campo oculto"></p>
                                 </div>
-                                <div class="field">
-                                    <label class="label" for="senha-nova">Nova senha<span class="req">*</span></label>
-                                    <input class="input" type="password" id="senha-nova" name="novaSenha" minlength="8" maxlength="72" required autocomplete="new-password">
-                                    <p class="hint">Mínimo 8 caracteres</p>
-                                    <div class="field-error"></div>
+                                <div class="campo">
+                                    <label class="rotulo" for="senha-nova">Nova senha</label>
+                                    <input class="entrada" type="password" id="senha-nova" name="novaSenha" minlength="8" maxlength="72" required autocomplete="new-password" placeholder="Mínimo 8 caracteres">
+                                    <p class="erro-campo oculto"></p>
                                 </div>
                             </div>
-                            <div class="row">
-                                <button type="submit" class="btn btn-primary">Trocar senha</button>
+                            <div class="linha-acoes">
+                                <button type="submit" class="botao botao--primario">Trocar senha</button>
                             </div>
                         </form>
                     </div>
