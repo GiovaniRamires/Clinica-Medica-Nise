@@ -30,6 +30,15 @@ public class Paciente {
     @Column(length = 2000)
     private String prontuario;
 
+    /**
+     * Login do próprio paciente, quando ele se cadastrou sozinho
+     * (POST /auth/cadastro-paciente). Nulo para pacientes cadastrados pela
+     * recepção/administrador sem conta — eles não acessam o sistema.
+     */
+    @OneToOne(optional = true)
+    @JoinColumn(name = "usuario_id", unique = true)
+    private Usuario usuario;
+
     public Paciente(String nome, String cpf, String convenio, String alergias, String prontuario) {
         this.nome = nome;
         this.cpf = cpf;

@@ -81,7 +81,8 @@ function primeiroNome(nome) {
 const PERFIS = {
     ADMINISTRADOR: 'Administrador',
     MEDICO: 'Médico',
-    RECEPCIONISTA: 'Recepcionista'
+    RECEPCIONISTA: 'Recepcionista',
+    PACIENTE: 'Paciente'
 };
 
 function perfilAtual() {
@@ -90,6 +91,10 @@ function perfilAtual() {
 
 function ehAdministrador() {
     return perfilAtual() === 'ADMINISTRADOR';
+}
+
+function ehPaciente() {
+    return perfilAtual() === 'PACIENTE';
 }
 
 /** Quem pode ver consulta e prontuário: médico e administrador. */
@@ -257,6 +262,7 @@ function encerrarSessao(mensagem) {
     usuarios = [];
 
     document.getElementById('aplicacao').classList.add('oculto');
+    document.getElementById('tela-cadastro-paciente').classList.add('oculto');
     document.getElementById('tela-login').classList.remove('oculto');
     if (mensagem) mostrarToast(mensagem, 'erro');
 }
@@ -290,13 +296,18 @@ async function abrirAplicacao() {
     `;
 
     aplicarPermissoes();
-    trocarAba('dashboard');
+    trocarAba(ehPaciente() ? 'minhas-consultas' : 'dashboard');
     await carregarTudo();
 }
 
 /** Carrega só o que o perfil tem permissão de ler. */
 async function carregarTudo() {
     try {
+        if (ehPaciente()) {
+            await carregarListaDeMedicosParaPaciente();
+            await carregarMinhasConsultas();
+            return;
+        }
         await carregarPacientes();
         await carregarMedicos();
         await carregarAgendamentos();
@@ -305,6 +316,110 @@ async function carregarTudo() {
         renderizarDashboard();
     } catch (erro) {
         mostrarToast(erro.mensagem, 'erro');
+    }
+}
+
+
+/* ======================= AUTO-CADASTRO DE PACIENTE ===================== */
+
+function mostrarCadastroPaciente() {
+    document.getElementById('tela-login').classList.add('oculto');
+    document.getElementById('tela-cadastro-paciente').classList.remove('oculto');
+}
+
+function mostrarLogin() {
+    document.getElementById('tela-cadastro-paciente').classList.add('oculto');
+    document.getElementById('tela-login').classList.remove('oculto');
+}
+
+async function cadastrarPaciente(evento) {
+    evento.preventDefault();
+    const form = evento.target;
+    const erro = document.getElementById('erro-cadastro-paciente');
+    erro.classList.add('oculto');
+    limparErros(form);
+
+    if (!form.reportValidity()) return;
+
+    const dados = lerFormulario(form);
+
+    try {
+        const resposta = await requisicao('/auth/cadastro-paciente', 'POST', {
+            nome: dados.nome,
+            cpf: dados.cpf,
+            email: dados.email,
+            senha: dados.senha,
+            convenio: dados.convenio
+        });
+        sessao = {token: resposta.token, usuario: resposta.usuario};
+        sessionStorage.setItem(CHAVE_TOKEN, resposta.token);
+        form.reset();
+        document.getElementById('tela-cadastro-paciente').classList.add('oculto');
+        mostrarToast('Conta criada! Bem-vindo(a), ' + primeiroNome(resposta.usuario.nome) + '.', 'ok');
+        await abrirAplicacao();
+    } catch (falha) {
+        if (falha.campos.length) {
+            mostrarErros(form, falha);
+        } else {
+            erro.textContent = falha.mensagem;
+            erro.classList.remove('oculto');
+        }
+    }
+}
+
+
+/* ========================= VISÃO DO PACIENTE =========================== */
+/* O paciente logado só vê a própria agenda — nunca usa /pacientes,
+   /medicos ou /agendamentos, que são das rotas administrativas. */
+
+async function carregarListaDeMedicosParaPaciente() {
+    const lista = await requisicao('/medicos');
+    const itens = lista.map(m => ({valor: m.id, texto: m.nome + ' — ' + m.especialidade}));
+    preencherSelect(document.getElementById('form-solicitar-consulta').elements.medicoId,
+        itens, 'Nenhum médico disponível no momento');
+}
+
+async function carregarMinhasConsultas() {
+    const minhas = await requisicao('/auth/minhas-consultas');
+    document.getElementById('contador-minhas-consultas').textContent = minhas.length;
+    const tabela = document.getElementById('tabela-minhas-consultas');
+
+    if (minhas.length === 0) {
+        tabela.innerHTML = '<tr><td class="vazio" colspan="4">Você ainda não tem consultas marcadas.</td></tr>';
+        return;
+    }
+
+    tabela.innerHTML = minhas.map(a => `
+        <tr>
+            <td>${esc(formatarData(a.data))}</td>
+            <td>${esc(a.horario)}</td>
+            <td>${esc(a.medico.nome)} (${esc(a.medico.especialidade)})</td>
+            <td><span class="selo selo--${esc(a.situacao)}">${esc(a.situacao)}</span></td>
+        </tr>
+    `).join('');
+}
+
+async function solicitarConsulta(evento) {
+    evento.preventDefault();
+    const form = evento.target;
+    limparErros(form);
+    if (!form.reportValidity()) return;
+
+    const dados = lerFormulario(form);
+
+    try {
+        await requisicao('/auth/solicitar-agendamento', 'POST', {
+            medicoId: Number(dados.medicoId),
+            data: dados.data,
+            horario: dados.horario,
+            observacoes: dados.observacoes
+        });
+        mostrarToast('Solicitação enviada. A clínica vai confirmar o horário.', 'ok');
+        form.reset();
+        await carregarMinhasConsultas();
+        trocarAba('minhas-consultas');
+    } catch (erro) {
+        mostrarErros(form, erro);
     }
 }
 
@@ -720,6 +835,12 @@ function mostrarAgendamentos() {
         const aberto = SITUACOES_ABERTAS.includes(agendamento.situacao);
         let acoes = '';
 
+        if (agendamento.situacao === 'SOLICITADO') {
+            // Solicitação do próprio paciente: a clínica confirma o horário
+            // (vira AGENDADO) ou recusa (vira CANCELADO).
+            acoes += `<button class="botao botao--primario botao--pequeno" onclick="alterarSituacao(${agendamento.id}, 'AGENDADO')">Confirmar</button>
+                      <button class="botao botao--perigo botao--pequeno" onclick="alterarSituacao(${agendamento.id}, 'CANCELADO')">Recusar</button>`;
+        }
         if (agendamento.situacao === 'AGENDADO') {
             acoes += `<button class="botao botao--secundario botao--pequeno" onclick="alterarSituacao(${agendamento.id}, 'CONFIRMADO')">Confirmar</button>`;
         }
@@ -1107,6 +1228,10 @@ async function iniciar() {
     // Formulários
     document.getElementById('form-login').addEventListener('submit', entrar);
     document.getElementById('botao-sair').addEventListener('click', sair);
+    document.getElementById('abrir-cadastro-paciente').addEventListener('click', mostrarCadastroPaciente);
+    document.getElementById('voltar-para-login').addEventListener('click', mostrarLogin);
+    document.getElementById('form-cadastro-paciente').addEventListener('submit', cadastrarPaciente);
+    document.getElementById('form-solicitar-consulta').addEventListener('submit', solicitarConsulta);
     document.getElementById('form-paciente').addEventListener('submit', salvarPaciente);
     document.getElementById('form-medico').addEventListener('submit', salvarMedico);
     document.getElementById('form-agendamento').addEventListener('submit', salvarAgendamento);

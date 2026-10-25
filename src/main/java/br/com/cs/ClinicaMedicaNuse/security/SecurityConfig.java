@@ -45,16 +45,14 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())   // reaproveita o CorsConfig e libera o preflight OPTIONS
                 .csrf(csrf -> csrf.disable())      // API stateless com Bearer token, sem cookie de sessão
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // O console do H2 renderiza em frames; liberado só para a mesma origem.
-                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/login", "/auth/logout", "/error").permitAll()
+                        .requestMatchers("/auth/login", "/auth/logout", "/auth/cadastro-paciente", "/error").permitAll()
                         // Interface web (pasta front-end/ publicada em /app/) e a raiz que redireciona para ela
                         .requestMatchers("/", "/app/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
-                        // ATENCAO: console de banco liberado para facilitar o desenvolvimento.
-                        // Em producao isto precisa sair (ou ficar atras de autenticacao).
-                        .requestMatchers("/h2-console/**").permitAll()
+
+                        // O paciente só acessa a própria agenda pelas rotas dedicadas em /auth
+                        .requestMatchers("/auth/minhas-consultas", "/auth/solicitar-agendamento").hasRole("PACIENTE")
 
                         // Dado clínico: só quem atende. A recepção não lê prontuário nem consulta.
                         .requestMatchers("/consultas/**").hasAnyRole("MEDICO", "ADMINISTRADOR")
@@ -66,11 +64,14 @@ public class SecurityConfig {
 
                         // Excluir paciente apaga histórico: só administrador
                         .requestMatchers(HttpMethod.DELETE, "/pacientes/**").hasRole("ADMINISTRADOR")
-                        // Cadastrar/editar paciente e cuidar da agenda: qualquer usuário autenticado
-                        .requestMatchers("/pacientes/**", "/agendamentos/**").authenticated()
+                        // Cadastrar/editar paciente e cuidar da agenda: equipe da clínica, nao o
+                        // proprio paciente (ele usa as rotas dedicadas acima)
+                        .requestMatchers("/pacientes/**", "/agendamentos/**").hasAnyRole("MEDICO", "RECEPCIONISTA", "ADMINISTRADOR")
 
-                        // Corpo clínico: leitura para todos os autenticados, manutenção só do administrador
-                        .requestMatchers(HttpMethod.GET, "/medicos/**").authenticated()
+                        // Corpo clínico: leitura para a equipe da clínica e para o paciente (que
+                        // precisa da lista para escolher médico ao solicitar consulta); manutenção
+                        // só do administrador.
+                        .requestMatchers(HttpMethod.GET, "/medicos/**").hasAnyRole("MEDICO", "RECEPCIONISTA", "ADMINISTRADOR", "PACIENTE")
                         .requestMatchers("/medicos/**").hasRole("ADMINISTRADOR")
 
                         .anyRequest().authenticated())

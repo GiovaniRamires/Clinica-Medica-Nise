@@ -22,4 +22,7 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
 
     /** Listagem da agenda em ordem cronológica. */
     List<Agendamento> findAllByOrderByDataAscHorarioAsc();
+
+    /** Agenda do próprio paciente logado. */
+    List<Agendamento> findByPacienteIdOrderByDataAscHorarioAsc(Long pacienteId);
 }
