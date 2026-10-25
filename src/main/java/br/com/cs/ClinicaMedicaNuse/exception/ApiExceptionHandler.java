@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -58,6 +59,20 @@ public class ApiExceptionHandler {
                 HttpStatus.BAD_REQUEST.value(),
                 "Bad Request",
                 "Corpo da requisição inválido: verifique o JSON e os formatos de data (yyyy-MM-dd) e horário (HH:mm)",
+                request.getRequestURI()));
+    }
+
+    /**
+     * Falta de permissao vinda do Spring Security. Sem este handler a excecao
+     * cairia no catch-all abaixo e um 403 legitimo viraria 500.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErroResponse> tratarAcessoNegado(AccessDeniedException ex,
+                                                           HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErroResponse.de(
+                HttpStatus.FORBIDDEN.value(),
+                "Forbidden",
+                "Seu perfil não tem permissão para esta operação",
                 request.getRequestURI()));
     }
 

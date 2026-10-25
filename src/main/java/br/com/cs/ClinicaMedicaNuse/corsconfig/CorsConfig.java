@@ -20,7 +20,8 @@ public class CorsConfig {
                 registry.addMapping("/**")
                         .allowedOrigins("*")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                        .allowedHeaders("Content-Type")
+                        // Authorization leva o Bearer token do JWT
+                        .allowedHeaders("Content-Type", "Authorization")
                         .maxAge(3600);
             }
 
