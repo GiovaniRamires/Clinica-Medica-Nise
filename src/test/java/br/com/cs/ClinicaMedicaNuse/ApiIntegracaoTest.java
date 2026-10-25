@@ -1,35 +1,74 @@
 package br.com.cs.ClinicaMedicaNuse;
 
+import br.com.cs.ClinicaMedicaNuse.entity.Usuario;
+import br.com.cs.ClinicaMedicaNuse.repository.UsuarioRepository;
+import br.com.cs.ClinicaMedicaNuse.security.TokenService;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.time.LocalDate;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * Testes de ponta a ponta da API: garantem o contrato dos DTOs (o que entra,
  * o que sai e o que NÃO sai), a validação dos campos e as regras de negócio.
+ *
+ * A API passou a exigir autenticação, então o MockMvc desta classe já vai com
+ * o token de um ADMINISTRADOR em todas as requisições. Quem testa as permissões
+ * por perfil é o SegurancaIntegracaoTest.
  */
 @SpringBootTest
-@AutoConfigureMockMvc
 @Transactional
 class ApiIntegracaoTest {
 
     @Autowired
+    private WebApplicationContext contexto;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private TokenService tokenService;
+
     private MockMvc mockMvc;
 
     private static final String AMANHA = LocalDate.now().plusDays(1).toString();
+
+    @BeforeEach
+    void autenticarComoAdministrador() {
+        var admin = usuarioRepository.findByEmail("teste-admin@clinicanise.local")
+                .orElseGet(() -> usuarioRepository.save(new Usuario(
+                        "Admin de teste",
+                        "teste-admin@clinicanise.local",
+                        passwordEncoder.encode("senhaDeTeste123"),
+                        Usuario.Perfil.ADMINISTRADOR)));
+
+        // Token assinado de verdade, igual ao que o login emite.
+        String autorizacao = "Bearer " + tokenService.gerar(admin);
+
+        mockMvc = MockMvcBuilders.webAppContextSetup(contexto)
+                .apply(springSecurity())
+                .defaultRequest(get("/").header("Authorization", autorizacao))
+                .build();
+    }
 
     /* --------------------------- utilidades --------------------------- */
 

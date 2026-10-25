@@ -4,9 +4,16 @@
  * Front-end da Clínica Médica Nise
  * ---------------------------------------------------------------------
  * Consome a API REST do back-end (Spring Boot) usando fetch.
- * A API só troca DTOs: enviamos PacienteRequest, AgendamentoRequest, etc.
- * e recebemos PacienteResponse, AgendamentoResponse, ...
- * Quando dá erro, o back-end devolve sempre o mesmo formato:
+ *
+ * Autenticação: POST /auth/login devolve um token JWT. Guardamos o token no
+ * sessionStorage e mandamos em todo request no header
+ *     Authorization: Bearer <token>
+ * Usamos sessionStorage (e não localStorage) para o token morrer quando a aba
+ * fecha. Qualquer 401 derruba a sessão e volta para a tela de login.
+ *
+ * A API só troca DTOs: enviamos PacienteRequest, AgendamentoRequest, etc. e
+ * recebemos PacienteResponse, AgendamentoResponse, ... Quando dá erro, o
+ * back-end devolve sempre o mesmo formato:
  *     { status, erro, mensagem, caminho, momento, campos: [{campo, mensagem}] }
  *
  * Se a página for aberta pelo Spring (http://localhost:8080/app/index.html),
@@ -19,11 +26,17 @@ const API = location.protocol === 'file:' ? 'http://localhost:8080' : '';
 // Situações em que o agendamento ainda pode ser atendido.
 const SITUACOES_ABERTAS = ['AGENDADO', 'CONFIRMADO'];
 
+const CHAVE_TOKEN = 'clinica.token';
+
+// Sessão do usuário logado: token JWT + dados vindos do login.
+let sessao = {token: null, usuario: null};
+
 // Listas carregadas da API, usadas para montar as tabelas e os selects.
 let pacientes = [];
 let medicos = [];
 let agendamentos = [];
 let consultas = [];
+let usuarios = [];
 
 
 /* ============================= AJUDANTES ============================= */
@@ -51,28 +64,69 @@ function formatarCpf(cpf) {
     return cpf.slice(0, 3) + '.' + cpf.slice(3, 6) + '.' + cpf.slice(6, 9) + '-' + cpf.slice(9);
 }
 
+/** Duas iniciais a partir do nome, para o avatar — "Maria Silva" -> "MS". */
+function iniciais(nome) {
+    if (!nome) return '?';
+    const partes = nome.trim().split(/\s+/);
+    const primeira = partes[0]?.[0] || '';
+    const ultima = partes.length > 1 ? partes[partes.length - 1][0] : '';
+    return (primeira + ultima).toUpperCase();
+}
+
+/** Primeiro nome, para a saudação "Olá, Maria!" no topo. */
+function primeiroNome(nome) {
+    return nome ? nome.trim().split(/\s+/)[0] : '';
+}
+
+const PERFIS = {
+    ADMINISTRADOR: 'Administrador',
+    MEDICO: 'Médico',
+    RECEPCIONISTA: 'Recepcionista'
+};
+
+function perfilAtual() {
+    return sessao.usuario ? sessao.usuario.perfil : null;
+}
+
+function ehAdministrador() {
+    return perfilAtual() === 'ADMINISTRADOR';
+}
+
+/** Quem pode ver consulta e prontuário: médico e administrador. */
+function podeVerDadoClinico() {
+    return perfilAtual() === 'MEDICO' || ehAdministrador();
+}
+
 /**
- * Faz a chamada HTTP e já trata o corpo de erro padrão da API.
+ * Faz a chamada HTTP com o token da sessão e já trata o corpo de erro padrão.
  * Em caso de falha, lança um objeto { status, mensagem, campos }.
  */
 async function requisicao(caminho, metodo = 'GET', corpo = null) {
+    const headers = {};
+    if (corpo) headers['Content-Type'] = 'application/json';
+    if (sessao.token) headers['Authorization'] = 'Bearer ' + sessao.token;
+
     let resposta;
     try {
         resposta = await fetch(API + caminho, {
             method: metodo,
-            headers: corpo ? {'Content-Type': 'application/json'} : {},
+            headers: headers,
             body: corpo ? JSON.stringify(corpo) : null
         });
     } catch (falha) {
         throw {status: 0, mensagem: 'Não foi possível falar com a API. O back-end está rodando em localhost:8080?', campos: []};
     }
 
-    if (resposta.status === 204) return null;          // DELETE não devolve corpo
+    if (resposta.status === 204) return null;          // DELETE e troca de senha não devolvem corpo
 
     const texto = await resposta.text();
     const dados = texto ? JSON.parse(texto) : null;
 
     if (!resposta.ok) {
+        // Token expirado ou inválido: não há o que fazer na tela, volta pro login.
+        if (resposta.status === 401 && sessao.token) {
+            encerrarSessao('Sua sessão expirou. Entre novamente.');
+        }
         throw {
             status: resposta.status,
             mensagem: (dados && dados.mensagem) || ('Erro ' + resposta.status),
@@ -82,19 +136,14 @@ async function requisicao(caminho, metodo = 'GET', corpo = null) {
     return dados;
 }
 
-let timerAviso;
-
-/** Mostra a mensagem flutuante no canto da tela. */
-function mostrarAviso(texto, tipo, itens) {
-    const aviso = document.getElementById('aviso');
-    aviso.className = 'aviso aviso--' + tipo;
-    let html = esc(texto);
-    if (itens && itens.length) {
-        html += '<ul>' + itens.map(item => '<li>' + esc(item) + '</li>').join('') + '</ul>';
-    }
-    aviso.innerHTML = html;
-    clearTimeout(timerAviso);
-    timerAviso = setTimeout(() => aviso.classList.add('oculto'), 5000);
+/** Mostra um toast no canto da tela, no estilo do protótipo. */
+function mostrarToast(texto, tipo = 'info') {
+    const container = document.getElementById('toasts');
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + (tipo === 'erro' ? 'erro' : tipo === 'ok' ? 'sucesso' : '');
+    toast.textContent = texto;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
 }
 
 /** Lê os campos de um formulário como objeto; campo vazio virá como null. */
@@ -108,27 +157,31 @@ function lerFormulario(form) {
 }
 
 function limparErros(form) {
-    form.querySelectorAll('.erro-campo').forEach(no => no.remove());
-    form.querySelectorAll('[aria-invalid]').forEach(no => no.removeAttribute('aria-invalid'));
+    form.querySelectorAll('[aria-invalid="true"]').forEach(campo => campo.removeAttribute('aria-invalid'));
+    form.querySelectorAll('.erro-campo').forEach(erro => {
+        erro.textContent = '';
+        erro.classList.add('oculto');
+    });
 }
 
 /** Destaca no formulário cada campo que o back-end recusou. */
 function mostrarErros(form, erro) {
     if (erro.campos.length === 0) {
-        mostrarAviso(erro.mensagem, 'erro');
+        mostrarToast(erro.mensagem, 'erro');
         return;
     }
     erro.campos.forEach(item => {
-        const campo = form.elements[item.campo];
-        if (!campo) return;
-        campo.setAttribute('aria-invalid', 'true');
-        const rotulo = campo.closest('label') || campo.parentElement;
-        const aviso = document.createElement('span');
-        aviso.className = 'erro-campo';
-        aviso.textContent = item.mensagem;
-        rotulo.appendChild(aviso);
+        const entrada = form.elements[item.campo];
+        if (!entrada) return;
+        entrada.setAttribute('aria-invalid', 'true');
+        const campo = entrada.closest('.campo');
+        const mensagem = campo && campo.querySelector('.erro-campo');
+        if (mensagem) {
+            mensagem.textContent = item.mensagem;
+            mensagem.classList.remove('oculto');
+        }
     });
-    mostrarAviso('Corrija os campos destacados.', 'erro', erro.campos.map(c => c.mensagem));
+    mostrarToast('Corrija os campos destacados.', 'erro');
 }
 
 /** Monta as opções de um <select>. */
@@ -146,12 +199,291 @@ function preencherSelect(select, itens, textoQuandoVazio) {
 }
 
 function trocarAba(nome) {
-    document.querySelectorAll('.aba').forEach(aba => {
-        aba.setAttribute('aria-selected', String(aba.dataset.painel === nome));
+    document.querySelectorAll('.nav-item[data-painel]').forEach(botao => {
+        botao.classList.toggle('active', botao.dataset.painel === nome);
     });
-    document.querySelectorAll('.painel').forEach(painel => {
+    document.querySelectorAll('.pagina').forEach(painel => {
         painel.classList.toggle('oculto', painel.id !== 'painel-' + nome);
     });
+    document.getElementById('aplicacao').classList.remove('menu-aberto');
+}
+
+
+/* ======================= LOGIN E SESSÃO ============================== */
+
+async function entrar(evento) {
+    evento.preventDefault();
+    const form = evento.target;
+    const erro = document.getElementById('erro-login');
+    erro.classList.add('oculto');
+    limparErros(form);
+
+    if (!form.reportValidity()) return;
+
+    const dados = lerFormulario(form);
+
+    try {
+        const resposta = await requisicao('/auth/login', 'POST', {
+            email: dados.email,
+            senha: dados.senha
+        });
+        sessao = {token: resposta.token, usuario: resposta.usuario};
+        sessionStorage.setItem(CHAVE_TOKEN, resposta.token);
+        form.reset();
+        await abrirAplicacao();
+    } catch (falha) {
+        erro.textContent = falha.mensagem;
+        erro.classList.remove('oculto');
+    }
+}
+
+async function sair() {
+    try {
+        await requisicao('/auth/logout', 'POST');
+    } catch (falha) {
+        // O logout do JWT é só no cliente: se a chamada falhar, seguimos saindo.
+    }
+    encerrarSessao();
+}
+
+/** Limpa a sessão e volta para a tela de login. */
+function encerrarSessao(mensagem) {
+    sessao = {token: null, usuario: null};
+    sessionStorage.removeItem(CHAVE_TOKEN);
+    pacientes = [];
+    medicos = [];
+    agendamentos = [];
+    consultas = [];
+    usuarios = [];
+
+    document.getElementById('aplicacao').classList.add('oculto');
+    document.getElementById('tela-login').classList.remove('oculto');
+    if (mensagem) mostrarToast(mensagem, 'erro');
+}
+
+/**
+ * Esconde da tela tudo que o perfil do usuário não pode usar.
+ * Isso é conveniência de interface: quem garante a regra é o back-end, que
+ * devolve 403 mesmo se alguém chamar o endpoint na mão.
+ */
+function aplicarPermissoes() {
+    const perfil = perfilAtual();
+    document.querySelectorAll('[data-perfil]').forEach(elemento => {
+        const permitidos = elemento.dataset.perfil.split(',');
+        elemento.classList.toggle('oculto', !permitidos.includes(perfil));
+    });
+}
+
+/** Entra na aplicação: mostra os dados do usuário, aplica permissões e carrega tudo. */
+async function abrirAplicacao() {
+    document.getElementById('tela-login').classList.add('oculto');
+    document.getElementById('aplicacao').classList.remove('oculto');
+
+    const usuario = sessao.usuario;
+    document.getElementById('saudacao-nome').textContent = primeiroNome(usuario.nome) + '!';
+    document.getElementById('usuario-avatar').textContent = iniciais(usuario.nome);
+
+    document.getElementById('ficha-conta').innerHTML = `
+        <div><p class="ficha-rotulo">Nome</p><p class="ficha-valor">${esc(usuario.nome)}</p></div>
+        <div><p class="ficha-rotulo">E-mail</p><p class="ficha-valor">${esc(usuario.email)}</p></div>
+        <div><p class="ficha-rotulo">Perfil</p><p class="ficha-valor">${esc(PERFIS[usuario.perfil] || usuario.perfil)}</p></div>
+    `;
+
+    aplicarPermissoes();
+    trocarAba('dashboard');
+    await carregarTudo();
+}
+
+/** Carrega só o que o perfil tem permissão de ler. */
+async function carregarTudo() {
+    try {
+        await carregarPacientes();
+        await carregarMedicos();
+        await carregarAgendamentos();
+        if (podeVerDadoClinico()) await carregarConsultas();
+        if (ehAdministrador()) await carregarUsuarios();
+        renderizarDashboard();
+    } catch (erro) {
+        mostrarToast(erro.mensagem, 'erro');
+    }
+}
+
+
+/* ============================== DASHBOARD ============================= */
+/* Espelha o Dashboard.tsx do protótipo: 4 cards de resumo, o card de próximo
+   atendimento, ações rápidas, alertas e a lista de hoje/amanhã — só que com
+   dados vindos da API em vez de valores fixos no componente. */
+
+/** Atualiza o dashboard só se a aplicação já estiver na tela (evita
+ *  renderizar antes da primeira carga, quando os elementos ainda não
+ *  têm todos os dados prontos). */
+function atualizarDashboardSeAberto() {
+    if (!document.getElementById('aplicacao').classList.contains('oculto')) {
+        renderizarDashboard();
+    }
+}
+
+function renderizarDashboard() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const amanha = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+
+    const agendaAbertaOrdenada = agendamentos
+        .filter(a => SITUACOES_ABERTAS.includes(a.situacao))
+        .sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario));
+
+    const deHojeOuAmanha = agendaAbertaOrdenada.filter(a => a.data === hoje || a.data === amanha);
+    const proximo = agendaAbertaOrdenada[0];
+
+    // ---- cards de resumo ----
+    const cards = [
+        {
+            rotulo: 'Próximo atendimento',
+            valor: proximo ? formatarData(proximo.data) : '—',
+            sub: proximo ? proximo.horario : 'Nenhum agendado',
+            cor: '#1d4ed8'
+        },
+        {rotulo: 'Agendamentos abertos', valor: agendaAbertaOrdenada.length, sub: 'Agendados ou confirmados', cor: '#16a34a'},
+        {rotulo: 'Pacientes cadastrados', valor: pacientes.length, sub: 'Total na base', cor: '#16a34a'},
+        {rotulo: 'Médicos ativos', valor: medicos.length, sub: 'No corpo clínico', cor: '#475569'}
+    ];
+    document.getElementById('cards-resumo').innerHTML = cards.map(c => `
+        <div class="card-resumo">
+            <p class="card-resumo-rotulo">${esc(c.rotulo)}</p>
+            <p class="card-resumo-valor" style="color:${c.cor}">${esc(c.valor)}</p>
+            <p class="card-resumo-sub">${esc(c.sub)}</p>
+        </div>
+    `).join('');
+
+    // ---- card "próximo atendimento" ----
+    const cartaoProximo = document.getElementById('cartao-proximo-atendimento');
+    if (!proximo) {
+        cartaoProximo.innerHTML = `
+            <div class="cartao-corpo">
+                <h2 class="cartao-titulo" style="margin-bottom:8px">Nenhum atendimento agendado</h2>
+                <p class="dica">Agende uma consulta para o próximo paciente aparecer aqui.</p>
+            </div>`;
+    } else {
+        cartaoProximo.innerHTML = `
+            <div class="cartao-corpo">
+                <div class="proximo-atendimento-cabecalho">
+                    <div>
+                        <h2 class="cartao-titulo" style="margin-bottom:8px">Próximo atendimento</h2>
+                        <span class="selo selo--${esc(proximo.situacao)}">${esc(proximo.situacao)}</span>
+                    </div>
+                    <span class="dica">${esc(formatarData(proximo.data))}</span>
+                </div>
+                <div class="proximo-atendimento-linhas">
+                    <div><p class="ficha-rotulo">Paciente</p><p class="ficha-valor">${esc(proximo.paciente.nome)}</p></div>
+                    <div><p class="ficha-rotulo">Médico</p><p class="ficha-valor">${esc(proximo.medico.nome)} (${esc(proximo.medico.especialidade)})</p></div>
+                    <div><p class="ficha-rotulo">Horário</p><p class="ficha-valor">${esc(proximo.horario)}</p></div>
+                    <div><p class="ficha-rotulo">Observações</p><p class="ficha-valor">${esc(proximo.observacoes)}</p></div>
+                </div>
+            </div>`;
+    }
+
+    // ---- alertas ----
+    const alertas = [];
+    const semMedico = pacientes.length > 0 && medicos.length === 0;
+    if (semMedico) {
+        alertas.push({
+            tipo: 'aviso', icone: '⚠️', titulo: 'Nenhum médico cadastrado',
+            texto: 'Cadastre um médico para poder marcar agendamentos.'
+        });
+    }
+    const consultasAFazer = agendamentos.filter(a => SITUACOES_ABERTAS.includes(a.situacao) && (a.data === hoje));
+    if (consultasAFazer.length > 0 && podeVerDadoClinico()) {
+        alertas.push({
+            tipo: 'info', icone: 'ℹ️', titulo: `${consultasAFazer.length} atendimento(s) hoje`,
+            texto: 'Confira a agenda do dia antes de começar os atendimentos.'
+        });
+    }
+    document.getElementById('alertas-dashboard').innerHTML = alertas.map(a => `
+        <div class="alerta alerta--${a.tipo}">
+            <span class="alerta-icone">${a.icone}</span>
+            <div>
+                <p class="alerta-titulo">${esc(a.titulo)}</p>
+                <p class="alerta-texto">${esc(a.texto)}</p>
+            </div>
+        </div>
+    `).join('');
+
+    // ---- lista de hoje/amanhã ----
+    const lista = document.getElementById('lista-dashboard');
+    if (deHojeOuAmanha.length === 0) {
+        lista.innerHTML = '<p class="vazio" style="padding:20px 24px">Nenhum agendamento para hoje ou amanhã.</p>';
+    } else {
+        lista.innerHTML = deHojeOuAmanha.map(a => `
+            <div class="item-lista-dashboard">
+                <div>
+                    <p class="item-lista-titulo">${esc(a.paciente.nome)}</p>
+                    <p class="item-lista-sub">${esc(formatarData(a.data))} · ${esc(a.horario)} · ${esc(a.medico.nome)}</p>
+                </div>
+                <span class="selo selo--${esc(a.situacao)}">${esc(a.situacao)}</span>
+            </div>
+        `).join('');
+    }
+
+    // O cartão de demonstração só faz sentido com o banco vazio.
+    document.getElementById('cartao-demo').classList.toggle('oculto', pacientes.length > 0 || medicos.length > 0);
+}
+
+/**
+ * Cria pacientes, médicos e agendamentos fictícios pela própria API, no
+ * mesmo espírito dos dados de exemplo do protótipo Figma (lá: professor
+ * Carlos Almeida, turma ADS, alunos João Silva/Maria Souza/...). Aqui:
+ * nomes, CPFs e CRMs fictícios de uma clínica.
+ */
+async function criarDadosDemonstracao() {
+    const botao = document.getElementById('botao-seed');
+    botao.disabled = true;
+    botao.textContent = 'Criando…';
+
+    try {
+        const medicosSeed = [
+            {nome: 'Dra. Erika Miranda', crm: '111111/SP', especialidade: 'Cardiologia'},
+            {nome: 'Dr. Rafael Nunes', crm: '222222/SP', especialidade: 'Clínica Geral'}
+        ];
+        const pacientesSeed = [
+            {nome: 'João Silva', cpf: '11111111111', convenio: 'Unimed', alergias: 'Dipirona', prontuario: 'Hipertenso, uso continuo de losartana.'},
+            {nome: 'Maria Souza', cpf: '22222222222', convenio: 'Particular', alergias: 'Nenhuma conhecida', prontuario: 'Sem comorbidades.'},
+            {nome: 'Ana Oliveira', cpf: '33333333333', convenio: 'Bradesco Saúde', alergias: 'Penicilina', prontuario: 'Alérgica a penicilina, atenção na prescrição.'},
+            {nome: 'Lucas Santos', cpf: '44444444444', convenio: 'Particular', alergias: 'Nenhuma conhecida', prontuario: ''}
+        ];
+
+        const idsMedicos = [];
+        for (const m of medicosSeed) {
+            const criado = await requisicao('/medicos', 'POST', m);
+            idsMedicos.push(criado.id);
+        }
+
+        const idsPacientes = [];
+        for (const p of pacientesSeed) {
+            const criado = await requisicao('/pacientes', 'POST', p);
+            idsPacientes.push(criado.id);
+        }
+
+        const hoje = new Date();
+        const horarios = ['09:00', '10:30', '14:00', '16:00'];
+        for (let i = 0; i < idsPacientes.length; i++) {
+            const data = new Date(hoje.getTime() + i * 86400000).toISOString().slice(0, 10);
+            await requisicao('/agendamentos', 'POST', {
+                pacienteId: idsPacientes[i],
+                medicoId: idsMedicos[i % idsMedicos.length],
+                data: data,
+                horario: horarios[i % horarios.length],
+                observacoes: i === 0 ? 'Retorno de exames' : ''
+            });
+        }
+
+        mostrarToast('Dados de demonstração criados: ' + pacientesSeed.length + ' pacientes, '
+            + medicosSeed.length + ' médicos e ' + idsPacientes.length + ' agendamentos.', 'ok');
+        await carregarTudo();
+    } catch (erro) {
+        mostrarToast(erro.mensagem, 'erro');
+    } finally {
+        botao.disabled = false;
+        botao.textContent = '✨ Criar dados de demonstração';
+    }
 }
 
 
@@ -161,35 +493,39 @@ async function carregarPacientes() {
     pacientes = await requisicao('/pacientes');
     mostrarPacientes();
     atualizarSelectsDePaciente();
+    atualizarDashboardSeAberto();
 }
 
 function mostrarPacientes() {
-    document.getElementById('contador-pacientes').textContent = '(' + pacientes.length + ')';
+    document.getElementById('contador-pacientes').textContent = pacientes.length;
     const tabela = document.getElementById('tabela-pacientes');
+    const clinico = podeVerDadoClinico();
 
     if (pacientes.length === 0) {
-        tabela.innerHTML = '<tr><td class="vazio" colspan="5">Nenhum paciente cadastrado ainda.</td></tr>';
+        tabela.innerHTML = `<tr><td class="vazio" colspan="${clinico ? 5 : 4}">Nenhum paciente cadastrado ainda.</td></tr>`;
         return;
     }
 
-    tabela.innerHTML = pacientes.map(paciente => `
-        <tr>
-            <td>${esc(paciente.nome)}</td>
-            <td>${esc(formatarCpf(paciente.cpf))}</td>
-            <td>${esc(paciente.convenio)}</td>
-            <td>${esc(paciente.alergias)}</td>
-            <td>
-                <div class="col-acoes-celula">
-                    <button class="botao botao--neutro botao--pequeno"
-                            onclick="editarPaciente(${paciente.id})">Editar</button>
-                    <button class="botao botao--neutro botao--pequeno"
-                            onclick="verProntuario(${paciente.id})">Prontuário</button>
-                    <button class="botao botao--perigo botao--pequeno"
-                            onclick="excluirPaciente(${paciente.id})">Excluir</button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
+    tabela.innerHTML = pacientes.map(paciente => {
+        let acoes = `<button class="botao botao--secundario botao--pequeno" onclick="editarPaciente(${paciente.id})">Editar</button>`;
+        if (clinico) {
+            acoes += `<button class="botao botao--secundario botao--pequeno" onclick="verProntuario(${paciente.id})">Prontuário</button>`;
+        }
+        if (ehAdministrador()) {
+            acoes += `<button class="botao botao--perigo botao--pequeno" onclick="excluirPaciente(${paciente.id})">Excluir</button>`;
+        }
+        // Alergias é dado clínico: a coluna só existe para quem pode ver.
+        const alergias = clinico ? `<td>${esc(paciente.alergias)}</td>` : '';
+        return `
+            <tr>
+                <td>${esc(paciente.nome)}</td>
+                <td>${esc(formatarCpf(paciente.cpf))}</td>
+                <td>${esc(paciente.convenio)}</td>
+                ${alergias}
+                <td><div class="acoes-linha">${acoes}</div></td>
+            </tr>
+        `;
+    }).join('');
 }
 
 async function salvarPaciente(evento) {
@@ -205,10 +541,10 @@ async function salvarPaciente(evento) {
     try {
         if (id) {
             await requisicao('/pacientes/' + id, 'PUT', dados);
-            mostrarAviso('Paciente atualizado.', 'ok');
+            mostrarToast('Paciente atualizado.', 'ok');
         } else {
             await requisicao('/pacientes', 'POST', dados);
-            mostrarAviso('Paciente cadastrado.', 'ok');
+            mostrarToast('Paciente cadastrado.', 'ok');
         }
         cancelarEdicaoPaciente();
         await carregarPacientes();
@@ -225,8 +561,8 @@ function editarPaciente(id) {
     form.elements.nome.value = paciente.nome || '';
     form.elements.cpf.value = paciente.cpf || '';
     form.elements.convenio.value = paciente.convenio || '';
-    form.elements.alergias.value = paciente.alergias || '';
-    form.elements.prontuario.value = paciente.prontuario || '';
+    if (form.elements.alergias) form.elements.alergias.value = paciente.alergias || '';
+    if (form.elements.prontuario) form.elements.prontuario.value = paciente.prontuario || '';
 
     document.getElementById('titulo-form-paciente').textContent = 'Editando paciente';
     document.getElementById('cancelar-paciente').classList.remove('oculto');
@@ -247,10 +583,10 @@ async function excluirPaciente(id) {
 
     try {
         await requisicao('/pacientes/' + id, 'DELETE');
-        mostrarAviso('Paciente excluído.', 'ok');
+        mostrarToast('Paciente excluído.', 'ok');
         await carregarPacientes();
     } catch (erro) {
-        mostrarAviso(erro.mensagem, 'erro');
+        mostrarToast(erro.mensagem, 'erro');
     }
 }
 
@@ -263,11 +599,12 @@ async function carregarMedicos() {
 
     const itens = medicos.map(m => ({valor: m.id, texto: m.nome + ' — ' + m.especialidade}));
     preencherSelect(document.getElementById('form-agendamento').elements.medicoId,
-        itens, 'Cadastre um médico primeiro');
+        itens, 'Nenhum médico cadastrado');
+    atualizarDashboardSeAberto();
 }
 
 function mostrarMedicos() {
-    document.getElementById('contador-medicos').textContent = '(' + medicos.length + ')';
+    document.getElementById('contador-medicos').textContent = medicos.length;
     const tabela = document.getElementById('tabela-medicos');
 
     if (medicos.length === 0) {
@@ -275,21 +612,21 @@ function mostrarMedicos() {
         return;
     }
 
-    tabela.innerHTML = medicos.map(medico => `
-        <tr>
-            <td>${esc(medico.nome)}</td>
-            <td>${esc(medico.crm)}</td>
-            <td>${esc(medico.especialidade)}</td>
-            <td>
-                <div class="col-acoes-celula">
-                    <button class="botao botao--neutro botao--pequeno"
-                            onclick="editarMedico(${medico.id})">Editar</button>
-                    <button class="botao botao--perigo botao--pequeno"
-                            onclick="excluirMedico(${medico.id})">Excluir</button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
+    tabela.innerHTML = medicos.map(medico => {
+        // Manutenção do corpo clínico é só do administrador.
+        const acoes = ehAdministrador()
+            ? `<button class="botao botao--secundario botao--pequeno" onclick="editarMedico(${medico.id})">Editar</button>
+               <button class="botao botao--perigo botao--pequeno" onclick="excluirMedico(${medico.id})">Excluir</button>`
+            : '—';
+        return `
+            <tr>
+                <td>${esc(medico.nome)}</td>
+                <td>${esc(medico.crm)}</td>
+                <td>${esc(medico.especialidade)}</td>
+                <td><div class="acoes-linha">${acoes}</div></td>
+            </tr>
+        `;
+    }).join('');
 }
 
 async function salvarMedico(evento) {
@@ -305,10 +642,10 @@ async function salvarMedico(evento) {
     try {
         if (id) {
             await requisicao('/medicos/' + id, 'PUT', dados);
-            mostrarAviso('Médico atualizado.', 'ok');
+            mostrarToast('Médico atualizado.', 'ok');
         } else {
             await requisicao('/medicos', 'POST', dados);
-            mostrarAviso('Médico cadastrado.', 'ok');
+            mostrarToast('Médico cadastrado.', 'ok');
         }
         cancelarEdicaoMedico();
         await carregarMedicos();
@@ -345,10 +682,10 @@ async function excluirMedico(id) {
 
     try {
         await requisicao('/medicos/' + id, 'DELETE');
-        mostrarAviso('Médico excluído.', 'ok');
+        mostrarToast('Médico excluído.', 'ok');
         await carregarMedicos();
     } catch (erro) {
-        mostrarAviso(erro.mensagem, 'erro');
+        mostrarToast(erro.mensagem, 'erro');
     }
 }
 
@@ -367,10 +704,11 @@ async function carregarAgendamentos() {
     }));
     preencherSelect(document.getElementById('form-consulta').elements.agendamentoId,
         itens, 'Nenhum agendamento aberto');
+    atualizarDashboardSeAberto();
 }
 
 function mostrarAgendamentos() {
-    document.getElementById('contador-agendamentos').textContent = '(' + agendamentos.length + ')';
+    document.getElementById('contador-agendamentos').textContent = agendamentos.length;
     const tabela = document.getElementById('tabela-agendamentos');
 
     if (agendamentos.length === 0) {
@@ -383,16 +721,14 @@ function mostrarAgendamentos() {
         let acoes = '';
 
         if (agendamento.situacao === 'AGENDADO') {
-            acoes += `<button class="botao botao--neutro botao--pequeno"
-                              onclick="alterarSituacao(${agendamento.id}, 'CONFIRMADO')">Confirmar</button>`;
+            acoes += `<button class="botao botao--secundario botao--pequeno" onclick="alterarSituacao(${agendamento.id}, 'CONFIRMADO')">Confirmar</button>`;
+        }
+        if (aberto && podeVerDadoClinico()) {
+            acoes += `<button class="botao botao--primario botao--pequeno" onclick="atenderAgendamento(${agendamento.id})">Atender</button>`;
         }
         if (aberto) {
-            acoes += `<button class="botao botao--primario botao--pequeno"
-                              onclick="atenderAgendamento(${agendamento.id})">Atender</button>
-                      <button class="botao botao--neutro botao--pequeno"
-                              onclick="alterarSituacao(${agendamento.id}, 'AUSENTE')">Faltou</button>
-                      <button class="botao botao--perigo botao--pequeno"
-                              onclick="alterarSituacao(${agendamento.id}, 'CANCELADO')">Cancelar</button>`;
+            acoes += `<button class="botao botao--secundario botao--pequeno" onclick="alterarSituacao(${agendamento.id}, 'AUSENTE')">Faltou</button>
+                      <button class="botao botao--perigo botao--pequeno" onclick="alterarSituacao(${agendamento.id}, 'CANCELADO')">Cancelar</button>`;
         }
 
         return `
@@ -402,7 +738,7 @@ function mostrarAgendamentos() {
                 <td>${esc(agendamento.paciente.nome)}</td>
                 <td>${esc(agendamento.medico.nome)} (${esc(agendamento.medico.especialidade)})</td>
                 <td><span class="selo selo--${esc(agendamento.situacao)}">${esc(agendamento.situacao)}</span></td>
-                <td><div class="col-acoes-celula">${acoes || '—'}</div></td>
+                <td><div class="acoes-linha">${acoes || '—'}</div></td>
             </tr>
         `;
     }).join('');
@@ -424,7 +760,7 @@ async function salvarAgendamento(evento) {
             horario: dados.horario,
             observacoes: dados.observacoes
         });
-        mostrarAviso('Agendamento criado.', 'ok');
+        mostrarToast('Agendamento criado.', 'ok');
         form.reset();
         await carregarAgendamentos();
     } catch (erro) {
@@ -435,14 +771,14 @@ async function salvarAgendamento(evento) {
 async function alterarSituacao(id, situacao) {
     try {
         await requisicao('/agendamentos/' + id + '/situacao', 'PUT', {situacao: situacao});
-        mostrarAviso('Agendamento marcado como ' + situacao + '.', 'ok');
+        mostrarToast('Agendamento marcado como ' + situacao + '.', 'ok');
         await carregarAgendamentos();
     } catch (erro) {
-        mostrarAviso(erro.mensagem, 'erro');
+        mostrarToast(erro.mensagem, 'erro');
     }
 }
 
-/** Leva o atendente para a aba de consultas já com o agendamento escolhido. */
+/** Leva para a aba de consultas já com o agendamento escolhido. */
 function atenderAgendamento(id) {
     cancelarEdicaoConsulta();
     trocarAba('consultas');
@@ -460,7 +796,7 @@ async function carregarConsultas() {
 }
 
 function mostrarConsultas() {
-    document.getElementById('contador-consultas').textContent = '(' + consultas.length + ')';
+    document.getElementById('contador-consultas').textContent = consultas.length;
     const tabela = document.getElementById('tabela-consultas');
 
     if (consultas.length === 0) {
@@ -475,12 +811,7 @@ function mostrarConsultas() {
             <td>${esc(consulta.paciente.nome)}</td>
             <td>${esc(consulta.medico.nome)}</td>
             <td>${esc(consulta.queixaPrincipal)}</td>
-            <td>
-                <div class="col-acoes-celula">
-                    <button class="botao botao--neutro botao--pequeno"
-                            onclick="editarConsulta(${consulta.id})">Editar</button>
-                </div>
-            </td>
+            <td><div class="acoes-linha"><button class="botao botao--secundario botao--pequeno" onclick="editarConsulta(${consulta.id})">Editar</button></div></td>
         </tr>
     `).join('');
 }
@@ -503,7 +834,7 @@ async function salvarConsulta(evento) {
                 diagnostico: dados.diagnostico,
                 conduta: dados.conduta
             });
-            mostrarAviso('Consulta atualizada.', 'ok');
+            mostrarToast('Consulta atualizada.', 'ok');
         } else {
             await requisicao('/consultas', 'POST', {
                 agendamentoId: Number(dados.agendamentoId),
@@ -512,7 +843,7 @@ async function salvarConsulta(evento) {
                 diagnostico: dados.diagnostico,
                 conduta: dados.conduta
             });
-            mostrarAviso('Atendimento registrado.', 'ok');
+            mostrarToast('Atendimento registrado.', 'ok');
         }
         cancelarEdicaoConsulta();
         await carregarConsultas();
@@ -579,7 +910,7 @@ async function mostrarProntuario(pacienteId) {
         prontuario = await requisicao('/pacientes/' + pacienteId + '/prontuario');
     } catch (erro) {
         destino.innerHTML = '';
-        mostrarAviso(erro.mensagem, 'erro');
+        mostrarToast(erro.mensagem, 'erro');
         return;
     }
 
@@ -588,7 +919,7 @@ async function mostrarProntuario(pacienteId) {
     const historico = prontuario.consultas.length === 0
         ? '<p class="vazio">Este paciente ainda não possui consultas.</p>'
         : prontuario.consultas.map(consulta => `
-            <article class="consulta-historico">
+            <article class="item-prontuario">
                 <h3>${esc(formatarData(consulta.data))} às ${esc(consulta.horario)} —
                     ${esc(consulta.medico.nome)} (${esc(consulta.medico.especialidade)})</h3>
                 <p><strong>Queixa:</strong> ${esc(consulta.queixaPrincipal)}</p>
@@ -596,60 +927,212 @@ async function mostrarProntuario(pacienteId) {
                 <p><strong>Conduta:</strong> ${esc(consulta.conduta)}</p>
                 <p><strong>Observações:</strong> ${esc(consulta.observacoesMedicas)}</p>
             </article>
-        `).join('');
+        `).join('<div style="height:12px"></div>');
 
     destino.innerHTML = `
-        <section class="cartao">
-            <h2>Prontuário de ${esc(paciente.nome)}</h2>
-            <dl class="ficha">
-                <div><dt>Nome</dt><dd>${esc(paciente.nome)}</dd></div>
-                <div><dt>CPF</dt><dd>${esc(formatarCpf(paciente.cpf))}</dd></div>
-                <div><dt>Convênio</dt><dd>${esc(paciente.convenio)}</dd></div>
-                <div><dt>Alergias</dt><dd>${esc(paciente.alergias)}</dd></div>
-            </dl>
-            <p class="rotulo">Anotações gerais</p>
-            <p>${esc(paciente.prontuario)}</p>
-        </section>
-        <section class="cartao">
-            <h2>Histórico de consultas (${prontuario.totalConsultas})</h2>
-            ${historico}
-        </section>
+        <div class="cartao">
+            <div class="cartao-cabecalho"><h2 class="cartao-titulo">Prontuário de ${esc(paciente.nome)}</h2></div>
+            <div class="cartao-corpo">
+                <div class="grade-ficha">
+                    <div><p class="ficha-rotulo">Nome</p><p class="ficha-valor">${esc(paciente.nome)}</p></div>
+                    <div><p class="ficha-rotulo">CPF</p><p class="ficha-valor">${esc(formatarCpf(paciente.cpf))}</p></div>
+                    <div><p class="ficha-rotulo">Convênio</p><p class="ficha-valor">${esc(paciente.convenio)}</p></div>
+                    <div><p class="ficha-rotulo">Alergias</p><p class="ficha-valor">${esc(paciente.alergias)}</p></div>
+                </div>
+                <p class="ficha-rotulo" style="margin-top:18px">Anotações gerais</p>
+                <p class="ficha-valor">${esc(paciente.prontuario)}</p>
+            </div>
+        </div>
+        <div class="cartao">
+            <div class="cartao-cabecalho">
+                <h2 class="cartao-titulo">Histórico de consultas</h2>
+                <span class="selo selo--neutro">${prontuario.totalConsultas}</span>
+            </div>
+            <div class="cartao-corpo">${historico}</div>
+        </div>
     `;
+}
+
+
+/* ============================= USUÁRIOS ============================== */
+
+async function carregarUsuarios() {
+    usuarios = await requisicao('/usuarios');
+    mostrarUsuarios();
+}
+
+function mostrarUsuarios() {
+    document.getElementById('contador-usuarios').textContent = usuarios.length;
+    const tabela = document.getElementById('tabela-usuarios');
+
+    if (usuarios.length === 0) {
+        tabela.innerHTML = '<tr><td class="vazio" colspan="4">Nenhum usuário cadastrado.</td></tr>';
+        return;
+    }
+
+    tabela.innerHTML = usuarios.map(usuario => {
+        const ehVoce = sessao.usuario && usuario.id === sessao.usuario.id;
+        const excluir = ehVoce
+            ? ''
+            : `<button class="botao botao--perigo botao--pequeno" onclick="excluirUsuario(${usuario.id})">Excluir</button>`;
+        return `
+            <tr>
+                <td>${esc(usuario.nome)}${ehVoce ? ' <span class="selo selo--neutro">você</span>' : ''}</td>
+                <td>${esc(usuario.email)}</td>
+                <td>${esc(PERFIS[usuario.perfil] || usuario.perfil)}</td>
+                <td><div class="acoes-linha"><button class="botao botao--secundario botao--pequeno" onclick="editarUsuario(${usuario.id})">Editar</button>${excluir}</div></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function salvarUsuario(evento) {
+    evento.preventDefault();
+    const form = evento.target;
+    limparErros(form);
+    if (!form.reportValidity()) return;
+
+    const dados = lerFormulario(form);
+    const id = dados.id;
+
+    try {
+        if (id) {
+            // UsuarioAtualizacaoRequest não tem senha: trocar senha é outra operação.
+            await requisicao('/usuarios/' + id, 'PUT', {
+                nome: dados.nome,
+                email: dados.email,
+                perfil: dados.perfil
+            });
+            mostrarToast('Usuário atualizado.', 'ok');
+        } else {
+            await requisicao('/usuarios', 'POST', {
+                nome: dados.nome,
+                email: dados.email,
+                senha: dados.senha,
+                perfil: dados.perfil
+            });
+            mostrarToast('Usuário cadastrado.', 'ok');
+        }
+        cancelarEdicaoUsuario();
+        await carregarUsuarios();
+    } catch (erro) {
+        mostrarErros(form, erro);
+    }
+}
+
+function editarUsuario(id) {
+    const usuario = usuarios.find(u => u.id === id);
+    const form = document.getElementById('form-usuario');
+
+    form.elements.id.value = usuario.id;
+    form.elements.nome.value = usuario.nome || '';
+    form.elements.email.value = usuario.email || '';
+    form.elements.perfil.value = usuario.perfil || '';
+
+    // A senha não é editada aqui: esconde o campo e tira o required.
+    document.getElementById('campo-senha-usuario').classList.add('oculto');
+    form.elements.senha.removeAttribute('required');
+    form.elements.senha.value = '';
+
+    document.getElementById('titulo-form-usuario').textContent = 'Editando usuário';
+    document.getElementById('cancelar-usuario').classList.remove('oculto');
+    form.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+function cancelarEdicaoUsuario() {
+    const form = document.getElementById('form-usuario');
+    form.reset();
+    limparErros(form);
+
+    document.getElementById('campo-senha-usuario').classList.remove('oculto');
+    form.elements.senha.setAttribute('required', '');
+
+    document.getElementById('titulo-form-usuario').textContent = 'Novo usuário';
+    document.getElementById('cancelar-usuario').classList.add('oculto');
+}
+
+async function excluirUsuario(id) {
+    const usuario = usuarios.find(u => u.id === id);
+    if (!confirm('Excluir o usuário ' + usuario.nome + '?')) return;
+
+    try {
+        await requisicao('/usuarios/' + id, 'DELETE');
+        mostrarToast('Usuário excluído.', 'ok');
+        await carregarUsuarios();
+    } catch (erro) {
+        mostrarToast(erro.mensagem, 'erro');
+    }
+}
+
+
+/* =========================== TROCA DE SENHA ========================== */
+
+async function trocarSenha(evento) {
+    evento.preventDefault();
+    const form = evento.target;
+    limparErros(form);
+    if (!form.reportValidity()) return;
+
+    const dados = lerFormulario(form);
+
+    try {
+        await requisicao('/auth/senha', 'PUT', {
+            senhaAtual: dados.senhaAtual,
+            novaSenha: dados.novaSenha
+        });
+        form.reset();
+        mostrarToast('Senha trocada. Use a nova no próximo login.', 'ok');
+    } catch (erro) {
+        mostrarErros(form, erro);
+    }
 }
 
 
 /* ============================== INÍCIO =============================== */
 
 async function iniciar() {
-    // Abas
-    document.querySelectorAll('.aba').forEach(aba => {
-        aba.addEventListener('click', () => trocarAba(aba.dataset.painel));
+    // Navegação da sidebar
+    document.querySelectorAll('.nav-item[data-painel]').forEach(botao => {
+        botao.addEventListener('click', () => trocarAba(botao.dataset.painel));
     });
-    trocarAba('pacientes');
+
+    // Menu mobile (a sidebar fica fora da tela em telas estreitas)
+    document.getElementById('botao-menu-mobile').addEventListener('click', () => {
+        document.getElementById('aplicacao').classList.add('menu-aberto');
+    });
+    document.getElementById('overlay-mobile').addEventListener('click', () => {
+        document.getElementById('aplicacao').classList.remove('menu-aberto');
+    });
 
     // Formulários
+    document.getElementById('form-login').addEventListener('submit', entrar);
+    document.getElementById('botao-sair').addEventListener('click', sair);
     document.getElementById('form-paciente').addEventListener('submit', salvarPaciente);
     document.getElementById('form-medico').addEventListener('submit', salvarMedico);
     document.getElementById('form-agendamento').addEventListener('submit', salvarAgendamento);
     document.getElementById('form-consulta').addEventListener('submit', salvarConsulta);
+    document.getElementById('form-usuario').addEventListener('submit', salvarUsuario);
+    document.getElementById('form-senha').addEventListener('submit', trocarSenha);
+    document.getElementById('cancelar-paciente').addEventListener('click', cancelarEdicaoPaciente);
+    document.getElementById('cancelar-medico').addEventListener('click', cancelarEdicaoMedico);
+    document.getElementById('cancelar-consulta').addEventListener('click', cancelarEdicaoConsulta);
+    document.getElementById('cancelar-usuario').addEventListener('click', cancelarEdicaoUsuario);
     document.getElementById('select-prontuario').addEventListener('change', evento => {
         if (evento.target.value) mostrarProntuario(Number(evento.target.value));
         else document.getElementById('conteudo-prontuario').innerHTML = '';
     });
 
-    // Carga inicial
-    const status = document.getElementById('status-api');
+    // Se já existe um token nesta aba, confirma com o back-end antes de entrar.
+    const tokenSalvo = sessionStorage.getItem(CHAVE_TOKEN);
+    if (!tokenSalvo) return;
+
+    sessao.token = tokenSalvo;
     try {
-        await carregarPacientes();
-        await carregarMedicos();
-        await carregarAgendamentos();
-        await carregarConsultas();
-        status.textContent = 'API conectada';
-        status.className = 'status status--ok';
+        sessao.usuario = await requisicao('/auth/eu');
+        await abrirAplicacao();
     } catch (erro) {
-        status.textContent = 'API offline';
-        status.className = 'status status--erro';
-        mostrarAviso(erro.mensagem, 'erro');
+        // Token velho ou API fora: fica na tela de login.
+        encerrarSessao();
     }
 }
 
