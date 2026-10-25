@@ -1,36 +1,33 @@
 package br.com.cs.ClinicaMedicaNuse.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table (name = "paciente")
+@Table(name = "paciente")
 @Data
 @NoArgsConstructor
 public class Paciente {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column
-    @NotBlank
+    @Column(nullable = false, length = 120)
     private String nome;
 
-    @Pattern(regexp = "\\d{11}", message = "CPF deve conter exatamente 11 dígitos numéricos!")
-    @Column
-    @NotBlank
+    /** Único no banco: a checagem no service evita o 500, a constraint garante o dado. */
+    @Column(nullable = false, unique = true, length = 11)
     private String cpf;
 
-    @Column
+    @Column(length = 80)
     private String convenio;
 
-    @Column
+    @Column(length = 500)
     private String alergias;
 
-    @Column
+    @Column(length = 2000)
     private String prontuario;
 
     public Paciente(String nome, String cpf, String convenio, String alergias, String prontuario) {

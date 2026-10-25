@@ -1,6 +1,8 @@
 package br.com.cs.ClinicaMedicaNuse.controller;
 
-import br.com.cs.ClinicaMedicaNuse.entity.Agendamento;
+import br.com.cs.ClinicaMedicaNuse.dto.AgendamentoRequest;
+import br.com.cs.ClinicaMedicaNuse.dto.AgendamentoResponse;
+import br.com.cs.ClinicaMedicaNuse.dto.AlterarSituacaoRequest;
 import br.com.cs.ClinicaMedicaNuse.service.AgendamentoService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -12,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/agendamentos")
 public class AgendamentoController {
+
     private final AgendamentoService agendamentoService;
 
     public AgendamentoController(AgendamentoService agendamentoService) {
@@ -19,41 +22,30 @@ public class AgendamentoController {
     }
 
     @PostMapping
-    public ResponseEntity<Agendamento> criarAgendamento(@Valid @RequestBody Agendamento agendamento) {
-        if(agendamento.getPaciente() == null || agendamento.getPaciente().getId() == null || agendamento.getMedico() == null || agendamento.getMedico().getId() == null){
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        }
-        var novoAgendamento = agendamentoService.criar(
-                agendamento.getPaciente().getId(),
-                agendamento.getMedico().getId(),
-                agendamento.getData(),
-                agendamento.getHorario(),
-                agendamento.getObservacoes());
-        return ResponseEntity.status(HttpStatus.CREATED).body(novoAgendamento);
+    public ResponseEntity<AgendamentoResponse> criarAgendamento(@Valid @RequestBody AgendamentoRequest request) {
+        var agendamento = agendamentoService.criar(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(AgendamentoResponse.from(agendamento));
     }
 
     @GetMapping
-    public ResponseEntity<List<Agendamento>> listarAgendamentos() {
-        var agendamentos = agendamentoService.listarAgendamentos();
-        return ResponseEntity.status(HttpStatus.OK).body(agendamentos);
+    public ResponseEntity<List<AgendamentoResponse>> listarAgendamentos() {
+        return ResponseEntity.ok(AgendamentoResponse.from(agendamentoService.listarAgendamentos()));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Agendamento> buscarPorId(@PathVariable Long id) {
-        var agendamento = agendamentoService.buscarAgendamentosPorId(id);
-        return ResponseEntity.status(HttpStatus.OK).body(agendamento);
+    public ResponseEntity<AgendamentoResponse> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(AgendamentoResponse.from(agendamentoService.buscarAgendamentosPorId(id)));
     }
 
     @PutMapping("/{id}/realizado")
-    public ResponseEntity<Agendamento> marcarComoRealizado(@PathVariable Long id) {
-        return ResponseEntity.ok(agendamentoService.marcarComoRealizado(id));
+    public ResponseEntity<AgendamentoResponse> marcarComoRealizado(@PathVariable Long id) {
+        return ResponseEntity.ok(AgendamentoResponse.from(agendamentoService.marcarComoRealizado(id)));
     }
 
     @PutMapping("/{id}/situacao")
-    public ResponseEntity<Agendamento> alterarSituacao(@PathVariable Long id, @RequestParam Agendamento.SituacaoAgendamento situacao) {
-        return ResponseEntity.ok(agendamentoService.alterarSituacao(id, situacao));
+    public ResponseEntity<AgendamentoResponse> alterarSituacao(@PathVariable Long id,
+                                                               @Valid @RequestBody AlterarSituacaoRequest request) {
+        return ResponseEntity.ok(AgendamentoResponse.from(
+                agendamentoService.alterarSituacao(id, request.situacao())));
     }
-
-
-
 }

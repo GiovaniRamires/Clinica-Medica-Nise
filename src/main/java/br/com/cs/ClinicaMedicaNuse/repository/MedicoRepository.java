@@ -6,4 +6,9 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface MedicoRepository extends JpaRepository<Medico, Long> {
+
+    boolean existsByCrm(String crm);
+
+    /** Usado no update: ignora o próprio médico ao checar duplicidade de CRM. */
+    boolean existsByCrmAndIdNot(String crm, Long id);
 }

@@ -1,5 +1,7 @@
 package br.com.cs.ClinicaMedicaNuse.service;
 
+import br.com.cs.ClinicaMedicaNuse.dto.ConsultaAtualizacaoRequest;
+import br.com.cs.ClinicaMedicaNuse.dto.ConsultaRequest;
 import br.com.cs.ClinicaMedicaNuse.entity.Agendamento;
 import br.com.cs.ClinicaMedicaNuse.entity.Consulta;
 import br.com.cs.ClinicaMedicaNuse.repository.AgendamentoRepository;
@@ -13,6 +15,7 @@ import java.util.List;
 
 @Service
 public class ConsultaService {
+
     private final ConsultaRepository consultaRepository;
     private final AgendamentoRepository agendamentoRepository;
 
@@ -22,10 +25,11 @@ public class ConsultaService {
     }
 
     @Transactional
-    public Consulta criar(Long agendamentoId, String queixaPrincipal, String observacoesMedicas, String diagnostico, String conduta) {
-        var agendamento = agendamentoRepository.findById(agendamentoId).orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Agendamento id: " + agendamentoId + " não encontrado"));
+    public Consulta criar(ConsultaRequest request) {
+        var agendamento = agendamentoRepository.findById(request.agendamentoId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Agendamento id: " + request.agendamentoId() + " não encontrado"));
         var situacao = agendamento.getSituacao();
 
         if (situacao == Agendamento.SituacaoAgendamento.CANCELADO) {
@@ -37,22 +41,25 @@ public class ConsultaService {
         if (situacao == Agendamento.SituacaoAgendamento.REALIZADO) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Agendamento já realizou uma consulta!");
         }
-        Consulta consulta = new Consulta(agendamento, queixaPrincipal, observacoesMedicas, diagnostico, conduta);
+        Consulta consulta = new Consulta(
+                agendamento,
+                request.queixaPrincipal(),
+                request.observacoesMedicas(),
+                request.diagnostico(),
+                request.conduta());
         consultaRepository.save(consulta);
 
         agendamento.setSituacao(Agendamento.SituacaoAgendamento.REALIZADO);
         agendamentoRepository.save(agendamento);
         return consulta;
-
-
     }
 
 
     public List<Consulta> listarConsultas() {
-        return consultaRepository.findAll();
+        return consultaRepository.findAllByOrderByDataDescHorarioDesc();
     }
 
-    public List<Consulta> listarPorPaciente(Long pacienteId){
+    public List<Consulta> listarPorPaciente(Long pacienteId) {
         return consultaRepository.findByPacienteIdOrderByDataDescHorarioDesc(pacienteId);
     }
 
@@ -62,12 +69,12 @@ public class ConsultaService {
                 "Consulta id: " + id + " não encontrada"));
     }
 
-    public Consulta atualizar(Long id, String queixaPrincipal, String observacoesMedicas, String diagnostico, String conduta) {
+    public Consulta atualizar(Long id, ConsultaAtualizacaoRequest request) {
         var consulta = buscarConsultaPorId(id);
-        consulta.setQueixaPrincipal(queixaPrincipal);
-        consulta.setObservacoesMedicas(observacoesMedicas);
-        consulta.setDiagnostico(diagnostico);
-        consulta.setConduta(conduta);
+        consulta.setQueixaPrincipal(request.queixaPrincipal());
+        consulta.setObservacoesMedicas(request.observacoesMedicas());
+        consulta.setDiagnostico(request.diagnostico());
+        consulta.setConduta(request.conduta());
         return consultaRepository.save(consulta);
     }
 

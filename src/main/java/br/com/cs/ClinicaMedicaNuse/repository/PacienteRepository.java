@@ -8,4 +8,7 @@ import org.springframework.stereotype.Repository;
 public interface PacienteRepository extends JpaRepository<Paciente, Long> {
 
     boolean existsByCpf(String cpf);
+
+    /** Usado no update: ignora o próprio paciente ao checar duplicidade de CPF. */
+    boolean existsByCpfAndIdNot(String cpf, Long id);
 }
