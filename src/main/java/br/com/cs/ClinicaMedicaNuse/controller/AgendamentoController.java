@@ -20,6 +20,9 @@ public class AgendamentoController {
 
     @PostMapping
     public ResponseEntity<Agendamento> criarAgendamento(@Valid @RequestBody Agendamento agendamento) {
+        if(agendamento.getPaciente() == null || agendamento.getPaciente().getId() == null || agendamento.getMedico() == null || agendamento.getMedico().getId() == null){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
         var novoAgendamento = agendamentoService.criar(
                 agendamento.getPaciente().getId(),
                 agendamento.getMedico().getId(),
