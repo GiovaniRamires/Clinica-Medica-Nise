@@ -1,14 +1,257 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clinica Médica</title>
+    <title>Clínica Médica Nise</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Lista de Pacientes</h1>
-    <ul>"Lista de Pacientes"</ul>
 
-    <script src="script.js"></script>
+<header class="topo">
+    <div class="topo-conteudo">
+        <h1>Clínica Médica Nise</h1>
+        <p class="subtitulo">Pacientes, médicos, agenda e prontuário</p>
+    </div>
+    <span id="status-api" class="status status--checando">verificando API…</span>
+</header>
+
+<nav class="abas" role="tablist" aria-label="Seções do sistema">
+    <button class="aba" role="tab" id="aba-pacientes" aria-controls="painel-pacientes" aria-selected="true"
+            data-painel="pacientes">Pacientes
+    </button>
+    <button class="aba" role="tab" id="aba-medicos" aria-controls="painel-medicos" aria-selected="false"
+            data-painel="medicos">Médicos
+    </button>
+    <button class="aba" role="tab" id="aba-agenda" aria-controls="painel-agenda" aria-selected="false"
+            data-painel="agenda">Agenda
+    </button>
+    <button class="aba" role="tab" id="aba-consultas" aria-controls="painel-consultas" aria-selected="false"
+            data-painel="consultas">Consultas
+    </button>
+    <button class="aba" role="tab" id="aba-prontuario" aria-controls="painel-prontuario" aria-selected="false"
+            data-painel="prontuario">Prontuário
+    </button>
+</nav>
+
+<main>
+
+    <!-- ============================ PACIENTES ============================ -->
+    <section class="painel" id="painel-pacientes" role="tabpanel" aria-labelledby="aba-pacientes">
+        <div class="cartao">
+            <h2 id="titulo-form-paciente">Novo paciente</h2>
+            <form id="form-paciente" novalidate>
+                <input type="hidden" name="id">
+                <div class="grade">
+                    <label>Nome*
+                        <input name="nome" maxlength="120" required autocomplete="off">
+                    </label>
+                    <label>CPF* <span class="dica">(11 dígitos, só números)</span>
+                        <input name="cpf" inputmode="numeric" maxlength="11" required autocomplete="off">
+                    </label>
+                    <label>Convênio
+                        <input name="convenio" maxlength="80" autocomplete="off">
+                    </label>
+                </div>
+                <label>Alergias
+                    <textarea name="alergias" rows="2" maxlength="500"></textarea>
+                </label>
+                <label>Prontuário <span class="dica">(histórico/anotações gerais)</span>
+                    <textarea name="prontuario" rows="3" maxlength="2000"></textarea>
+                </label>
+                <div class="acoes-form">
+                    <button type="submit" class="botao botao--primario">Salvar paciente</button>
+                    <button type="button" id="cancelar-paciente" class="botao botao--neutro oculto"
+                            onclick="cancelarEdicaoPaciente()">
+                        Cancelar edição
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="cartao">
+            <h2>Pacientes cadastrados <span id="contador-pacientes" class="contador"></span></h2>
+            <div class="tabela-rolagem">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>CPF</th>
+                        <th>Convênio</th>
+                        <th>Alergias</th>
+                        <th class="col-acoes">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tabela-pacientes"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================= MÉDICOS ============================= -->
+    <section class="painel oculto" id="painel-medicos" role="tabpanel" aria-labelledby="aba-medicos">
+        <div class="cartao">
+            <h2 id="titulo-form-medico">Novo médico</h2>
+            <form id="form-medico" novalidate>
+                <input type="hidden" name="id">
+                <div class="grade">
+                    <label>Nome*
+                        <input name="nome" maxlength="120" required autocomplete="off">
+                    </label>
+                    <label>CRM* <span class="dica">(ex: 123456 ou 123456/SP)</span>
+                        <input name="crm" maxlength="10" required autocomplete="off">
+                    </label>
+                    <label>Especialidade*
+                        <input name="especialidade" maxlength="80" required autocomplete="off">
+                    </label>
+                </div>
+                <div class="acoes-form">
+                    <button type="submit" class="botao botao--primario">Salvar médico</button>
+                    <button type="button" id="cancelar-medico" class="botao botao--neutro oculto"
+                            onclick="cancelarEdicaoMedico()">
+                        Cancelar edição
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="cartao">
+            <h2>Médicos cadastrados <span id="contador-medicos" class="contador"></span></h2>
+            <div class="tabela-rolagem">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>CRM</th>
+                        <th>Especialidade</th>
+                        <th class="col-acoes">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tabela-medicos"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================== AGENDA ============================= -->
+    <section class="painel oculto" id="painel-agenda" role="tabpanel" aria-labelledby="aba-agenda">
+        <div class="cartao">
+            <h2>Novo agendamento</h2>
+            <form id="form-agendamento" novalidate>
+                <div class="grade">
+                    <label>Paciente*
+                        <select name="pacienteId" required></select>
+                    </label>
+                    <label>Médico*
+                        <select name="medicoId" required></select>
+                    </label>
+                </div>
+                <div class="grade">
+                    <label>Data*
+                        <input type="date" name="data" required>
+                    </label>
+                    <label>Horário*
+                        <input type="time" name="horario" required>
+                    </label>
+                </div>
+                <label>Observações
+                    <textarea name="observacoes" rows="2" maxlength="500"></textarea>
+                </label>
+                <div class="acoes-form">
+                    <button type="submit" class="botao botao--primario">Agendar</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="cartao">
+            <h2>Agenda <span id="contador-agendamentos" class="contador"></span></h2>
+            <div class="tabela-rolagem">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Hora</th>
+                        <th>Paciente</th>
+                        <th>Médico</th>
+                        <th>Situação</th>
+                        <th class="col-acoes">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tabela-agendamentos"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================= CONSULTAS =========================== -->
+    <section class="painel oculto" id="painel-consultas" role="tabpanel" aria-labelledby="aba-consultas">
+        <div class="cartao">
+            <h2 id="titulo-form-consulta">Registrar atendimento</h2>
+            <form id="form-consulta" novalidate>
+                <input type="hidden" name="id">
+                <label id="campo-agendamento">Agendamento*
+                    <select name="agendamentoId" required></select>
+                    <span class="dica">Só aparecem agendamentos ainda não atendidos.</span>
+                </label>
+                <label>Queixa principal*
+                    <textarea name="queixaPrincipal" rows="2" maxlength="500" required></textarea>
+                </label>
+                <div class="grade">
+                    <label>Diagnóstico
+                        <textarea name="diagnostico" rows="3" maxlength="2000"></textarea>
+                    </label>
+                    <label>Conduta
+                        <textarea name="conduta" rows="3" maxlength="2000"></textarea>
+                    </label>
+                </div>
+                <label>Observações médicas
+                    <textarea name="observacoesMedicas" rows="3" maxlength="2000"></textarea>
+                </label>
+                <div class="acoes-form">
+                    <button type="submit" class="botao botao--primario">Salvar consulta</button>
+                    <button type="button" id="cancelar-consulta" class="botao botao--neutro oculto"
+                            onclick="cancelarEdicaoConsulta()">
+                        Cancelar edição
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="cartao">
+            <h2>Consultas registradas <span id="contador-consultas" class="contador"></span></h2>
+            <div class="tabela-rolagem">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Hora</th>
+                        <th>Paciente</th>
+                        <th>Médico</th>
+                        <th>Queixa</th>
+                        <th class="col-acoes">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tabela-consultas"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================ PRONTUÁRIO =========================== -->
+    <section class="painel oculto" id="painel-prontuario" role="tabpanel" aria-labelledby="aba-prontuario">
+        <div class="cartao">
+            <h2>Consultar prontuário</h2>
+            <label>Paciente
+                <select id="select-prontuario"></select>
+            </label>
+        </div>
+        <div id="conteudo-prontuario"></div>
+    </section>
+
+</main>
+
+<div id="aviso" class="aviso oculto" role="status" aria-live="polite"></div>
+
+<script src="script.js"></script>
 </body>
 </html>
