@@ -1,5 +1,6 @@
 package br.com.cs.ClinicaMedicaNuse.service;
 
+import br.com.cs.ClinicaMedicaNuse.dto.MedicoRequest;
 import br.com.cs.ClinicaMedicaNuse.entity.Medico;
 import br.com.cs.ClinicaMedicaNuse.repository.MedicoRepository;
 import org.springframework.http.HttpStatus;
@@ -10,14 +11,19 @@ import java.util.List;
 
 @Service
 public class MedicoService {
+
     private final MedicoRepository medicoRepository;
 
     public MedicoService(MedicoRepository medicoRepository) {
         this.medicoRepository = medicoRepository;
     }
 
-    public Medico criar(String nome, String crm, String especialidade) {
-        Medico medico = new Medico(nome, crm, especialidade);
+    public Medico criar(MedicoRequest request) {
+        // CRM identifica o médico: dois cadastros com o mesmo CRM são a mesma pessoa.
+        if (medicoRepository.existsByCrm(request.crm())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Médico com CRM já cadastrado");
+        }
+        var medico = new Medico(request.nome(), request.crm(), request.especialidade());
         return medicoRepository.save(medico);
     }
 
@@ -31,11 +37,16 @@ public class MedicoService {
                 "Médico id: " + id + " não encontrado"));
     }
 
-    public Medico atualizar(Long id, String nome, String crm, String especialidade) {
+    public Medico atualizar(Long id, MedicoRequest request) {
         var medico = buscarMedicoPorId(id);
-        medico.setNome(nome);
-        medico.setCrm(crm);
-        medico.setEspecialidade(especialidade);
+
+        if (medicoRepository.existsByCrmAndIdNot(request.crm(), id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Médico com CRM já cadastrado");
+        }
+
+        medico.setNome(request.nome());
+        medico.setCrm(request.crm());
+        medico.setEspecialidade(request.especialidade());
         return medicoRepository.save(medico);
     }
 

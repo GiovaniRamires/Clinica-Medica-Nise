@@ -8,5 +8,9 @@ import java.util.List;
 
 @Repository
 public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
+
     List<Consulta> findByPacienteIdOrderByDataDescHorarioDesc(Long pacienteId);
+
+    /** Listagem geral já ordenada da consulta mais recente para a mais antiga. */
+    List<Consulta> findAllByOrderByDataDescHorarioDesc();
 }
