@@ -1,30 +1,41 @@
 package br.com.cs.ClinicaMedicaNuse.controller;
 
-import br.com.cs.ClinicaMedicaNuse.dto.AlterarSenhaRequest;
-import br.com.cs.ClinicaMedicaNuse.dto.LoginRequest;
-import br.com.cs.ClinicaMedicaNuse.dto.LoginResponse;
-import br.com.cs.ClinicaMedicaNuse.dto.UsuarioResponse;
+import br.com.cs.ClinicaMedicaNuse.dto.*;
 import br.com.cs.ClinicaMedicaNuse.security.UsuarioLogado;
+import br.com.cs.ClinicaMedicaNuse.service.AgendamentoService;
 import br.com.cs.ClinicaMedicaNuse.service.AuthService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
 
     private final AuthService authService;
+    private final AgendamentoService agendamentoService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, AgendamentoService agendamentoService) {
         this.authService = authService;
+        this.agendamentoService = agendamentoService;
     }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    /**
+     * Auto-cadastro público: qualquer pessoa cria sua própria conta de
+     * paciente. Já devolve o login pronto, como o POST /auth/login.
+     */
+    @PostMapping("/cadastro-paciente")
+    public ResponseEntity<LoginResponse> cadastrarPaciente(@Valid @RequestBody CadastroPacienteRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.cadastrarPaciente(request));
     }
 
     /**
@@ -50,5 +61,24 @@ public class AuthController {
                                              @Valid @RequestBody AlterarSenhaRequest request) {
         authService.alterarSenha(UsuarioLogado.id(principal), request);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * As consultas marcadas do paciente logado. O id do paciente vem do
+     * vínculo com o token, nunca de um id na URL que o cliente poderia trocar.
+     */
+    @GetMapping("/minhas-consultas")
+    public ResponseEntity<List<AgendamentoResponse>> minhasConsultas(Principal principal) {
+        var paciente = authService.buscarPacienteLogado(UsuarioLogado.id(principal));
+        return ResponseEntity.ok(AgendamentoResponse.from(agendamentoService.listarPorPaciente(paciente.getId())));
+    }
+
+    /** O paciente logado solicita uma consulta; a clínica confirma depois. */
+    @PostMapping("/solicitar-agendamento")
+    public ResponseEntity<AgendamentoResponse> solicitarAgendamento(Principal principal,
+                                                                     @Valid @RequestBody SolicitacaoAgendamentoRequest request) {
+        var paciente = authService.buscarPacienteLogado(UsuarioLogado.id(principal));
+        var agendamento = agendamentoService.solicitar(paciente, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(AgendamentoResponse.from(agendamento));
     }
 }

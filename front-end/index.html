@@ -46,6 +46,60 @@
         <div class="login-rodape">
             <span>🔒 Acesso restrito à equipe da clínica</span>
         </div>
+        <div class="login-rodape">
+            <button type="button" class="link-cadastro" id="abrir-cadastro-paciente">Sou paciente e quero me cadastrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- =================== CADASTRO PÚBLICO DE PACIENTE ================
+     Auto-registro: a pessoa cria a própria conta de paciente e já entra
+     logada. O cadastro clínico (alergias, prontuário) é preenchido depois
+     pela clínica, não aqui. -->
+<div id="tela-cadastro-paciente" class="tela-login oculto">
+    <div class="login-caixa">
+        <div class="login-logo">
+            <span class="logo-marca logo-marca--grande">C</span>
+            <span class="login-nome-marca">Clínica Nise</span>
+        </div>
+        <h1 class="login-titulo">Criar minha conta de paciente</h1>
+        <p class="login-subtitulo">Depois de criar a conta você já pode solicitar consultas.</p>
+
+        <div class="login-card">
+            <form id="form-cadastro-paciente" novalidate>
+                <div class="campo">
+                    <label class="rotulo" for="cad-nome">Nome completo</label>
+                    <input class="entrada" id="cad-nome" name="nome" maxlength="120" required autocomplete="name">
+                    <p class="erro-campo oculto"></p>
+                </div>
+                <div class="campo">
+                    <label class="rotulo" for="cad-cpf">CPF</label>
+                    <input class="entrada" id="cad-cpf" name="cpf" inputmode="numeric" maxlength="11" required autocomplete="off" placeholder="11 dígitos, só números">
+                    <p class="erro-campo oculto"></p>
+                </div>
+                <div class="campo">
+                    <label class="rotulo" for="cad-convenio">Convênio <span class="dica">(opcional)</span></label>
+                    <input class="entrada" id="cad-convenio" name="convenio" maxlength="80" autocomplete="off">
+                    <p class="erro-campo oculto"></p>
+                </div>
+                <div class="campo">
+                    <label class="rotulo" for="cad-email">E-mail</label>
+                    <input class="entrada" id="cad-email" name="email" type="email" required autocomplete="email">
+                    <p class="erro-campo oculto"></p>
+                </div>
+                <div class="campo">
+                    <label class="rotulo" for="cad-senha">Senha</label>
+                    <input class="entrada" id="cad-senha" name="senha" type="password" minlength="8" maxlength="72" required autocomplete="new-password" placeholder="Mínimo 8 caracteres">
+                    <p class="erro-campo oculto"></p>
+                </div>
+                <button type="submit" class="botao-entrar">Criar conta e entrar</button>
+                <p id="erro-cadastro-paciente" class="mensagem-erro oculto" role="alert"></p>
+            </form>
+        </div>
+
+        <div class="login-rodape">
+            <button type="button" class="link-cadastro" id="voltar-para-login">← Já tenho conta, voltar para o login</button>
+        </div>
     </div>
 </div>
 
@@ -62,15 +116,20 @@
         </div>
 
         <nav class="sidebar-nav">
-            <p class="nav-rotulo">Atendimento</p>
-            <button class="nav-item active" data-painel="dashboard"><span class="nav-icone">▦</span><span>Dashboard</span></button>
-            <button class="nav-item" data-painel="pacientes"><span class="nav-icone">▤</span><span>Pacientes</span></button>
-            <button class="nav-item" data-painel="medicos"><span class="nav-icone">◎</span><span>Médicos</span></button>
-            <button class="nav-item" data-painel="agenda"><span class="nav-icone">≡</span><span>Agenda</span></button>
+            <p class="nav-rotulo" data-perfil="ADMINISTRADOR,MEDICO,RECEPCIONISTA">Atendimento</p>
+            <button class="nav-item active" data-painel="dashboard" data-perfil="ADMINISTRADOR,MEDICO,RECEPCIONISTA"><span class="nav-icone">▦</span><span>Dashboard</span></button>
+            <button class="nav-item" data-painel="pacientes" data-perfil="ADMINISTRADOR,MEDICO,RECEPCIONISTA"><span class="nav-icone">▤</span><span>Pacientes</span></button>
+            <button class="nav-item" data-painel="medicos" data-perfil="ADMINISTRADOR,MEDICO,RECEPCIONISTA"><span class="nav-icone">◎</span><span>Médicos</span></button>
+            <button class="nav-item" data-painel="agenda" data-perfil="ADMINISTRADOR,MEDICO,RECEPCIONISTA"><span class="nav-icone">≡</span><span>Agenda</span></button>
             <button class="nav-item" data-painel="consultas" data-perfil="MEDICO,ADMINISTRADOR"><span class="nav-icone">▣</span><span>Consultas</span></button>
             <button class="nav-item" data-painel="prontuario" data-perfil="MEDICO,ADMINISTRADOR"><span class="nav-icone">▢</span><span>Prontuário</span></button>
             <p class="nav-rotulo" data-perfil="ADMINISTRADOR">Administração</p>
             <button class="nav-item" data-painel="usuarios" data-perfil="ADMINISTRADOR"><span class="nav-icone">◉</span><span>Usuários</span></button>
+
+            <!-- Menu reduzido do paciente: só a própria agenda. -->
+            <p class="nav-rotulo" data-perfil="PACIENTE">Minha agenda</p>
+            <button class="nav-item" data-painel="minhas-consultas" data-perfil="PACIENTE"><span class="nav-icone">≡</span><span>Minhas consultas</span></button>
+            <button class="nav-item" data-painel="solicitar-consulta" data-perfil="PACIENTE"><span class="nav-icone">▦</span><span>Solicitar consulta</span></button>
         </nav>
 
         <div class="sidebar-rodape">
@@ -96,10 +155,75 @@
 
         <main class="conteudo">
 
+            <!-- ===================== MINHAS CONSULTAS (PACIENTE) ==============
+                 Visão do próprio paciente: só a agenda dele, nunca a de outros. -->
+            <section class="pagina oculto" id="painel-minhas-consultas">
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Minhas consultas</h2>
+                        <span class="selo selo--neutro" id="contador-minhas-consultas"></span>
+                    </div>
+                    <div class="tabela-scroll">
+                        <table class="tabela">
+                            <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Hora</th>
+                                <th>Médico</th>
+                                <th>Situação</th>
+                            </tr>
+                            </thead>
+                            <tbody id="tabela-minhas-consultas"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =================== SOLICITAR CONSULTA (PACIENTE) ==============
+                 O paciente escolhe médico/data/hora; a clínica confirma depois
+                 (o agendamento nasce em SOLICITADO, não AGENDADO). -->
+            <section class="pagina oculto" id="painel-solicitar-consulta">
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Solicitar consulta</h2>
+                    </div>
+                    <div class="cartao-corpo">
+                        <p class="dica" style="margin-bottom:16px">Sua solicitação fica pendente até a clínica confirmar o horário.</p>
+                        <form id="form-solicitar-consulta" novalidate>
+                            <div class="grade-campos">
+                                <div class="campo">
+                                    <label class="rotulo" for="sol-medico">Médico</label>
+                                    <select class="entrada entrada--select" id="sol-medico" name="medicoId" required></select>
+                                    <p class="erro-campo oculto"></p>
+                                </div>
+                                <div class="campo">
+                                    <label class="rotulo" for="sol-data">Data</label>
+                                    <input class="entrada" type="date" id="sol-data" name="data" required>
+                                    <p class="erro-campo oculto"></p>
+                                </div>
+                                <div class="campo">
+                                    <label class="rotulo" for="sol-horario">Horário</label>
+                                    <input class="entrada" type="time" id="sol-horario" name="horario" required>
+                                    <p class="erro-campo oculto"></p>
+                                </div>
+                            </div>
+                            <div class="campo">
+                                <label class="rotulo" for="sol-observacoes">Observações <span class="dica">(opcional)</span></label>
+                                <textarea class="entrada entrada--area" id="sol-observacoes" name="observacoes" rows="2" maxlength="500"></textarea>
+                                <p class="erro-campo oculto"></p>
+                            </div>
+                            <div class="linha-acoes">
+                                <button type="submit" class="botao botao--primario">Solicitar consulta</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
             <!-- ========================== DASHBOARD ===========================
                  Espelha o Dashboard.tsx do protótipo: 4 cards de resumo, o card
                  "Próximo atendimento", ações rápidas, alertas e a lista do dia. -->
-            <section class="pagina" id="painel-dashboard">
+            <section class="pagina oculto" id="painel-dashboard">
                 <div class="grade-resumo" id="cards-resumo"></div>
 
                 <div class="grade-dashboard">

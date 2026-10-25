@@ -14,6 +14,8 @@
     @NoArgsConstructor
     public class Agendamento {
         public enum SituacaoAgendamento {
+            /** Pedido pelo próprio paciente, ainda não confirmado pela clínica. */
+            SOLICITADO,
             AGENDADO,
             CONFIRMADO,
             REALIZADO,

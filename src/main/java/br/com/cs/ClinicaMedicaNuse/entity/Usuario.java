@@ -14,6 +14,7 @@ public class Usuario {
 
     /**
      * Quem usa o sistema da clínica:
+     * - PACIENTE: vê as próprias consultas marcadas e solicita agendamento
      * - RECEPCIONISTA: cadastra pacientes e cuida da agenda
      * - MEDICO: atende, registra consultas e vê prontuário
      * - ADMINISTRADOR: tudo, incluindo o cadastro de usuários
@@ -21,7 +22,8 @@ public class Usuario {
     public enum Perfil {
         ADMINISTRADOR,
         MEDICO,
-        RECEPCIONISTA
+        RECEPCIONISTA,
+        PACIENTE
     }
 
     @Id

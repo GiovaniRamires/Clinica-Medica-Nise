@@ -99,6 +99,15 @@ table { border-collapse: collapse; width: 100%; }
     color: #94a3b8;
 }
 
+.link-cadastro {
+    background: none;
+    border: none;
+    font-size: 12px;
+    color: #1d4ed8;
+    font-weight: 500;
+}
+.link-cadastro:hover { text-decoration: underline; }
+
 .mensagem-erro {
     margin-top: 16px;
     font-size: 12.5px;
@@ -374,6 +383,7 @@ table { border-collapse: collapse; width: 100%; }
     white-space: nowrap;
 }
 .selo--neutro { background: #f1f5f9; color: #64748b; }
+.selo--SOLICITADO { background: #f5f3ff; color: #7c3aed; }
 .selo--AGENDADO, .selo--CONFIRMADO { background: #eff6ff; color: #1d4ed8; }
 .selo--REALIZADO { background: #f0fdf4; color: #16a34a; }
 .selo--AUSENTE { background: #fffbeb; color: #d97706; }

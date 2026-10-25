@@ -26,6 +26,13 @@ public class UsuarioService {
         if (usuarioRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um usuário com esse e-mail");
         }
+        // PACIENTE só nasce vinculado a um Paciente, pelo auto-cadastro público
+        // (POST /auth/cadastro-paciente). Criar um aqui deixaria /auth/minhas-consultas
+        // sem paciente para encontrar.
+        if (request.perfil() == Usuario.Perfil.PACIENTE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "O perfil PACIENTE é criado pelo auto-cadastro público, não por aqui");
+        }
         var usuario = new Usuario(
                 request.nome(),
                 request.email(),
@@ -49,6 +56,10 @@ public class UsuarioService {
 
         if (usuarioRepository.existsByEmailAndIdNot(request.email(), id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um usuário com esse e-mail");
+        }
+        if (request.perfil() == Usuario.Perfil.PACIENTE || usuario.getPerfil() == Usuario.Perfil.PACIENTE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "O perfil PACIENTE não é administrado por aqui");
         }
         // Rebaixar o último administrador deixaria o sistema sem quem cadastra usuário.
         if (usuario.getPerfil() == Usuario.Perfil.ADMINISTRADOR
