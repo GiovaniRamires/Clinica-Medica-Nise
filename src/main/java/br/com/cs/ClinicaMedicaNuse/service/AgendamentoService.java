@@ -48,9 +48,9 @@ public class AgendamentoService {
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "ID não encontrado"));
     }
 
-    public Agendamento marcarComoRealizado(Agendamento agendamento){
-        agendamento.setSituacao((SituacaoAgendamento.REALIZADO));
-        return agendamentoRepository.save(agendamento);
+    public Agendamento marcarComoRealizado(Long id){
+        return alterarSituacao(id, SituacaoAgendamento.REALIZADO);
+
     }
 
     public Agendamento alterarSituacao(Long id, SituacaoAgendamento nova){
@@ -60,14 +60,15 @@ public class AgendamentoService {
         boolean permitido = switch (atual){
             case AGENDADO -> nova == SituacaoAgendamento.CONFIRMADO
                     || nova == SituacaoAgendamento.CANCELADO
-                    || nova == SituacaoAgendamento.AUSENTE;
+                    || nova == SituacaoAgendamento.AUSENTE
+                    || nova == SituacaoAgendamento.REALIZADO;
             case CONFIRMADO ->  nova == SituacaoAgendamento.CANCELADO
                     || nova == SituacaoAgendamento.AUSENTE;
             default -> false;
         };
 
         if(!permitido){
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível mudar a situação de " + atual "para " + nova);
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível mudar a situação de " + atual + " para " + nova);
         }
 
         agendamento.setSituacao(nova);

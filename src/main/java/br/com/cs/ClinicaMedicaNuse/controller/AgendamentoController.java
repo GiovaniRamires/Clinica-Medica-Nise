@@ -44,11 +44,16 @@ public class AgendamentoController {
         return ResponseEntity.status(HttpStatus.OK).body(agendamento);
     }
 
+    @PutMapping("/{id}/realizado")
+    public ResponseEntity<Agendamento> marcarComoRealizado(@PathVariable Long id) {
+        return ResponseEntity.ok(agendamentoService.marcarComoRealizado(id));
+    }
+
     @PutMapping("/{id}/situacao")
     public ResponseEntity<Agendamento> alterarSituacao(@PathVariable Long id, @RequestParam Agendamento.SituacaoAgendamento situacao) {
-
-
-        var agendamento = agendamentoService.alterarSituacao(id, situacao);
-        return ResponseEntity.status(HttpStatus.OK).body(agendamento);
+        return ResponseEntity.ok(agendamentoService.alterarSituacao(id, situacao));
     }
+
+
+
 }

@@ -2,6 +2,7 @@ package br.com.cs.ClinicaMedicaNuse.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -18,7 +19,8 @@ public class Paciente {
     @NotBlank
     private String nome;
 
-    @Column(unique = true, nullable = false)
+    @Pattern(regexp = "\\d{11}", message = "CPF deve conter exatamente 11 dígitos numéricos!")
+    @Column
     @NotBlank
     private String cpf;
 
