@@ -8,7 +8,9 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import br.com.cs.ClinicaMedicaNuse.dto.HorarioDisponivelResponse;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -48,4 +50,12 @@ public class AgendamentoController {
         return ResponseEntity.ok(AgendamentoResponse.from(
                 agendamentoService.alterarSituacao(id, request.situacao())));
     }
+    @GetMapping("/horarios-disponiveis")
+    public ResponseEntity<HorarioDisponivelResponse.Agenda> horariosDisponiveis(
+            @RequestParam Long medicoId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data) {
+        return ResponseEntity.ok(agendamentoService.horariosDoDia(medicoId, data));
+    }
+
+
 }

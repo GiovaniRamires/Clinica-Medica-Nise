@@ -1,7 +1,7 @@
 package br.com.cs.ClinicaMedicaNuse.service;
 
-
 import br.com.cs.ClinicaMedicaNuse.dto.AgendamentoRequest;
+import br.com.cs.ClinicaMedicaNuse.dto.HorarioDisponivelResponse;
 import br.com.cs.ClinicaMedicaNuse.dto.SolicitacaoAgendamentoRequest;
 import br.com.cs.ClinicaMedicaNuse.entity.Agendamento;
 import br.com.cs.ClinicaMedicaNuse.entity.Paciente;
@@ -12,12 +12,19 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static br.com.cs.ClinicaMedicaNuse.entity.Agendamento.SituacaoAgendamento;
 
 @Service
 public class AgendamentoService {
+
+    private static final LocalTime ABERTURA = LocalTime.of(8, 0);
+    private static final LocalTime FECHAMENTO = LocalTime.of(18, 0);
+    private static final int DURACAO_MINUTOS = 30;
 
     private final AgendamentoRepository agendamentoRepository;
     private final PacienteService pacienteService;
@@ -39,12 +46,6 @@ public class AgendamentoService {
         return agendamentoRepository.save(agendamento);
     }
 
-    /**
-     * Solicitação feita pelo próprio paciente logado: vira um agendamento em
-     * SOLICITADO, que a recepção/administrador confirma (vira AGENDADO) ou
-     * recusa (vira CANCELADO). O paciente nunca cria um agendamento já
-     * confirmado sem passar por essa triagem.
-     */
     public Agendamento solicitar(Paciente paciente, SolicitacaoAgendamentoRequest request) {
         var medico = medicoService.buscarMedicoPorId(request.medicoId());
 
@@ -56,6 +57,8 @@ public class AgendamentoService {
     }
 
     private void checarConflitoDeHorario(Long medicoId, Long pacienteId, LocalDate data, LocalTime horario) {
+        validarHorarioNaGrade(horario);
+
         boolean horarioOcupado = agendamentoRepository.existsByMedicoIdAndDataAndHorarioAndSituacaoNot(
                 medicoId, data, horario, SituacaoAgendamento.CANCELADO);
         if (horarioOcupado) {
@@ -69,11 +72,37 @@ public class AgendamentoService {
         }
     }
 
+    private void validarHorarioNaGrade(LocalTime horario) {
+        boolean dentroDoExpediente = !horario.isBefore(ABERTURA) && horario.isBefore(FECHAMENTO);
+        boolean noPasso = horario.getMinute() % DURACAO_MINUTOS == 0 && horario.getSecond() == 0;
+        if (!dentroDoExpediente || !noPasso) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Horário inválido. Atendimento das 08:00 às 18:00, em intervalos de 30 minutos.");
+        }
+    }
+
+    public HorarioDisponivelResponse.Agenda horariosDoDia(Long medicoId, LocalDate data) {
+        medicoService.buscarMedicoPorId(medicoId);
+
+        Set<LocalTime> ocupados = new HashSet<>();
+        for (Agendamento a : agendamentoRepository.findByMedicoIdAndDataAndSituacaoNot(medicoId, data, SituacaoAgendamento.CANCELADO)) {
+            ocupados.add(a.getHorario());
+        }
+
+        List<HorarioDisponivelResponse> horarios = new ArrayList<>();
+        int livres = 0;
+        for (LocalTime t = ABERTURA; t.isBefore(FECHAMENTO); t = t.plusMinutes(DURACAO_MINUTOS)) {
+            boolean livre = !ocupados.contains(t);
+            if (livre) livres++;
+            horarios.add(new HorarioDisponivelResponse(t, livre));
+        }
+        return new HorarioDisponivelResponse.Agenda(horarios.size(), livres, DURACAO_MINUTOS, horarios);
+    }
+
     public List<Agendamento> listarAgendamentos() {
         return agendamentoRepository.findAllByOrderByDataAscHorarioAsc();
     }
 
-    /** Agenda do próprio paciente logado. */
     public List<Agendamento> listarPorPaciente(Long pacienteId) {
         return agendamentoRepository.findByPacienteIdOrderByDataAscHorarioAsc(pacienteId);
     }
@@ -85,7 +114,6 @@ public class AgendamentoService {
 
     public Agendamento marcarComoRealizado(Long id) {
         return alterarSituacao(id, SituacaoAgendamento.REALIZADO);
-
     }
 
     public Agendamento alterarSituacao(Long id, SituacaoAgendamento nova) {
@@ -93,8 +121,6 @@ public class AgendamentoService {
         var atual = agendamento.getSituacao();
 
         boolean permitido = switch (atual) {
-            // A recepção/administrador confirma a solicitação do paciente (vira
-            // um agendamento normal) ou recusa.
             case SOLICITADO -> nova == SituacaoAgendamento.AGENDADO
                     || nova == SituacaoAgendamento.CANCELADO;
             case AGENDADO -> nova == SituacaoAgendamento.CONFIRMADO
@@ -113,8 +139,5 @@ public class AgendamentoService {
 
         agendamento.setSituacao(nova);
         return agendamentoRepository.save(agendamento);
-
     }
-
-
 }
