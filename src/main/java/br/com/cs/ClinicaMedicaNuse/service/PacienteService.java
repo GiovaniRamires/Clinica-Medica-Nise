@@ -18,10 +18,7 @@ public class PacienteService {
         this.pacienteRepository = pacienteRepository;
     }
 
-    /**
-     * @param comDadoClinico false quando quem cadastra nao pode gravar dado
-     *                       clinico (recepcao): alergias e prontuario ficam vazios.
-     */
+
     public Paciente criar(PacienteRequest request, boolean comDadoClinico) {
         if (pacienteRepository.existsByCpf(request.cpf())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Paciente com CPF já cadastrado");
@@ -45,14 +42,11 @@ public class PacienteService {
                 "Paciente id: " + id + " não encontrado"));
     }
 
-    /**
-     * @param comDadoClinico false quando quem edita nao pode mexer em dado
-     *                       clinico: os valores ja gravados sao preservados, e nao apagados.
-     */
+
     public Paciente atualizar(Long id, PacienteRequest request, boolean comDadoClinico) {
         var paciente = buscarPacientePorId(id);
 
-        // O CPF só pode mudar para um que ainda não pertença a outro paciente.
+
         if (pacienteRepository.existsByCpfAndIdNot(request.cpf(), id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Paciente com CPF já cadastrado");
         }
