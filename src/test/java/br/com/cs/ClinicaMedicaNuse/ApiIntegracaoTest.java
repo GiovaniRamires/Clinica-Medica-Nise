@@ -97,10 +97,17 @@ class ApiIntegracaoTest {
                 """.formatted(nome, cpf), 201));
     }
 
+    /** Médico exige um usuário de perfil MEDICO: cria o login e liga os dois. */
+    private long criarUsuarioMedico(String email) {
+        return usuarioRepository.save(new Usuario(
+                "Usuario " + email, email, passwordEncoder.encode("senhaDeTeste123"),
+                Usuario.Perfil.MEDICO)).getId();
+    }
+
     private long criarMedico(String nome, String crm) throws Exception {
         return id(postar("/medicos", """
-                {"nome":"%s","crm":"%s","especialidade":"Cardiologia"}
-                """.formatted(nome, crm), 201));
+                {"nome":"%s","crm":"%s","especialidade":"Cardiologia","usuarioId":%d}
+                """.formatted(nome, crm, criarUsuarioMedico("medico-" + crm + "@clinicanise.local")), 201));
     }
 
     private long criarAgendamento(long pacienteId, long medicoId, String horario) throws Exception {
@@ -206,10 +213,69 @@ class ApiIntegracaoTest {
         criarMedico("Dr. House", "123456");
 
         String erro = postar("/medicos", """
-                {"nome":"Dra. Cuddy","crm":"123456","especialidade":"Endocrinologia"}
-                """, 409);
+                {"nome":"Dra. Cuddy","crm":"123456","especialidade":"Endocrinologia","usuarioId":%d}
+                """.formatted(criarUsuarioMedico("cuddy@clinicanise.local")), 409);
 
         assertThat((String) ler(erro, "$.mensagem")).contains("CRM");
+    }
+
+    @Test
+    @DisplayName("Médico sem usuarioId é recusado com 400")
+    void recusaMedicoSemUsuario() throws Exception {
+        String erro = postar("/medicos", """
+                {"nome":"Dr. House","crm":"123456","especialidade":"Clinico Geral"}
+                """, 400);
+
+        assertThat((String) ler(erro, "$.campos[0].campo")).isEqualTo("usuarioId");
+    }
+
+    @Test
+    @DisplayName("Médico com usuário inexistente devolve 404")
+    void recusaMedicoComUsuarioInexistente() throws Exception {
+        postar("/medicos", """
+                {"nome":"Dr. House","crm":"123456","especialidade":"Clinico Geral","usuarioId":999999}
+                """, 404);
+    }
+
+    @Test
+    @DisplayName("Médico com usuário de outro perfil devolve 400")
+    void recusaMedicoComUsuarioDePerfilErrado() throws Exception {
+        long recepcionista = usuarioRepository.save(new Usuario(
+                "Recepcao", "recepcao@clinicanise.local",
+                passwordEncoder.encode("senhaDeTeste123"), Usuario.Perfil.RECEPCIONISTA)).getId();
+
+        String erro = postar("/medicos", """
+                {"nome":"Dr. House","crm":"123456","especialidade":"Clinico Geral","usuarioId":%d}
+                """.formatted(recepcionista), 400);
+
+        assertThat((String) ler(erro, "$.mensagem")).contains("MEDICO");
+    }
+
+    @Test
+    @DisplayName("Dois médicos não podem usar o mesmo usuário (409)")
+    void recusaUsuarioJaVinculadoAOutroMedico() throws Exception {
+        long usuarioId = criarUsuarioMedico("house@clinicanise.local");
+        postar("/medicos", """
+                {"nome":"Dr. House","crm":"123456","especialidade":"Cardiologia","usuarioId":%d}
+                """.formatted(usuarioId), 201);
+
+        String erro = postar("/medicos", """
+                {"nome":"Dr. Wilson","crm":"654321","especialidade":"Oncologia","usuarioId":%d}
+                """.formatted(usuarioId), 409);
+
+        assertThat((String) ler(erro, "$.mensagem")).contains("vinculado");
+    }
+
+    @Test
+    @DisplayName("POST /medicos devolve o usuarioId vinculado")
+    void medicoDevolveUsuarioId() throws Exception {
+        long usuarioId = criarUsuarioMedico("house@clinicanise.local");
+
+        String corpo = postar("/medicos", """
+                {"nome":"Dr. House","crm":"123456","especialidade":"Cardiologia","usuarioId":%d}
+                """.formatted(usuarioId), 201);
+
+        assertThat(((Number) ler(corpo, "$.usuarioId")).longValue()).isEqualTo(usuarioId);
     }
 
     @Test
@@ -220,6 +286,25 @@ class ApiIntegracaoTest {
                 """, 400);
 
         assertThat((String) ler(erro, "$.campos[0].campo")).isEqualTo("crm");
+    }
+
+    @Test
+    @DisplayName("Usuário vinculado a um médico não pode ser excluído nem trocar de perfil (409)")
+    void protegeUsuarioVinculadoAMedico() throws Exception {
+        long usuarioId = criarUsuarioMedico("house@clinicanise.local");
+        postar("/medicos", """
+                {"nome":"Dr. House","crm":"123456","especialidade":"Cardiologia","usuarioId":%d}
+                """.formatted(usuarioId), 201);
+
+        mockMvc.perform(delete("/usuarios/" + usuarioId))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(put("/usuarios/" + usuarioId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Dr. House","email":"house@clinicanise.local","perfil":"RECEPCIONISTA"}
+                                """))
+                .andExpect(status().isConflict());
     }
 
     /* ---------------------------- agendamento -------------------------- */
@@ -360,6 +445,53 @@ class ApiIntegracaoTest {
                 """.formatted(agendamentoId), 400);
 
         assertThat((String) ler(erro, "$.campos[0].campo")).isEqualTo("queixaPrincipal");
+    }
+
+    @Test
+    @DisplayName("Cancelar libera o horário: ele volta à grade e aceita outro agendamento")
+    void cancelarLiberaOHorario() throws Exception {
+        verificaHorarioLiberadoAoMudarPara("CANCELADO");
+    }
+
+    @Test
+    @DisplayName("Falta (AUSENTE) também libera o horário")
+    void faltaLiberaOHorario() throws Exception {
+        verificaHorarioLiberadoAoMudarPara("AUSENTE");
+    }
+
+    private void verificaHorarioLiberadoAoMudarPara(String situacao) throws Exception {
+        long medicoId = criarMedico("Dr. House", "123456");
+        long primeiro = criarPaciente("Maria Silva", "11122233344");
+        long segundo = criarPaciente("Ana Oliveira", "55566677788");
+        long agendamentoId = criarAgendamento(primeiro, medicoId, "09:30");
+
+        // ocupado: some da grade e ninguém mais agenda esse horário
+        assertThat(horarioLivre(medicoId, "09:30")).isFalse();
+        postar("/agendamentos", """
+                {"pacienteId":%d,"medicoId":%d,"data":"%s","horario":"09:30"}
+                """.formatted(segundo, medicoId, AMANHA), 409);
+
+        mockMvc.perform(put("/agendamentos/{id}/situacao", agendamentoId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"situacao\":\"" + situacao + "\"}"))
+                .andExpect(status().isOk());
+
+        // liberado: volta à grade e aceita outro agendamento
+        assertThat(horarioLivre(medicoId, "09:30")).isTrue();
+        postar("/agendamentos", """
+                {"pacienteId":%d,"medicoId":%d,"data":"%s","horario":"09:30"}
+                """.formatted(segundo, medicoId, AMANHA), 201);
+        assertThat(horarioLivre(medicoId, "09:30")).isFalse();
+    }
+
+    private boolean horarioLivre(long medicoId, String horario) throws Exception {
+        String agenda = mockMvc.perform(get("/agendamentos/horarios-disponiveis")
+                        .param("medicoId", String.valueOf(medicoId))
+                        .param("data", AMANHA))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        java.util.List<Boolean> livre = JsonPath.read(agenda, "$.horarios[?(@.horario=='" + horario + "')].livre");
+        return livre.get(0);
     }
 
     @Test

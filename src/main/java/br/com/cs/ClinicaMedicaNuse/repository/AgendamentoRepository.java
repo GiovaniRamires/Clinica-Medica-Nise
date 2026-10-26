@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Collection;
 import java.util.List;
 
 import static br.com.cs.ClinicaMedicaNuse.entity.Agendamento.SituacaoAgendamento;
@@ -15,10 +16,10 @@ import static br.com.cs.ClinicaMedicaNuse.entity.Agendamento.SituacaoAgendamento
 public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> {
 
 
-    boolean existsByMedicoIdAndDataAndHorarioAndSituacaoNot(Long medicoId, LocalDate data, LocalTime horario, SituacaoAgendamento situacao);
+    boolean existsByMedicoIdAndDataAndHorarioAndSituacaoNotIn(Long medicoId, LocalDate data, LocalTime horario, Collection<SituacaoAgendamento> situacoes);
 
 
-    boolean existsByPacienteIdAndDataAndHorarioAndSituacaoNot(Long pacienteId, LocalDate data, LocalTime horario, SituacaoAgendamento situacao);
+    boolean existsByPacienteIdAndDataAndHorarioAndSituacaoNotIn(Long pacienteId, LocalDate data, LocalTime horario, Collection<SituacaoAgendamento> situacoes);
 
 
     List<Agendamento> findAllByOrderByDataAscHorarioAsc();
@@ -26,5 +27,5 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
 
     List<Agendamento> findByPacienteIdOrderByDataAscHorarioAsc(Long pacienteId);
 
-    List<Agendamento> findByMedicoIdAndDataAndSituacaoNot(Long medicoId, LocalDate data, SituacaoAgendamento situacao);
+    List<Agendamento> findByMedicoIdAndDataAndSituacaoNotIn(Long medicoId, LocalDate data, Collection<SituacaoAgendamento> situacoes);
 }

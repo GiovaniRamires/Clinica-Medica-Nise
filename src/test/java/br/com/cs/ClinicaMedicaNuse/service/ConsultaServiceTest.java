@@ -5,6 +5,7 @@ import br.com.cs.ClinicaMedicaNuse.dto.ConsultaRequest;
 import br.com.cs.ClinicaMedicaNuse.entity.Agendamento;
 import br.com.cs.ClinicaMedicaNuse.entity.Consulta;
 import br.com.cs.ClinicaMedicaNuse.entity.Medico;
+import br.com.cs.ClinicaMedicaNuse.entity.Usuario;
 import br.com.cs.ClinicaMedicaNuse.entity.Paciente;
 import br.com.cs.ClinicaMedicaNuse.repository.AgendamentoRepository;
 import br.com.cs.ClinicaMedicaNuse.repository.ConsultaRepository;
@@ -49,7 +50,8 @@ public class ConsultaServiceTest {
         paciente = new Paciente("Maria", "12345678901", "Unimed", null, null);
         paciente.setId(1L);
 
-        medico = new Medico("Dr. House", "123456", "Cardiologia");
+        medico = new Medico("Dr. House", "123456", "Cardiologia",
+                new Usuario("Dr. House", "house@clinicanise.local", "hash", Usuario.Perfil.MEDICO));
         medico.setId(2L);
 
         agendamento = new Agendamento(paciente, medico,

@@ -3,6 +3,7 @@ package br.com.cs.ClinicaMedicaNuse.controller;
 import br.com.cs.ClinicaMedicaNuse.dto.*;
 import br.com.cs.ClinicaMedicaNuse.security.UsuarioLogado;
 import br.com.cs.ClinicaMedicaNuse.service.AgendamentoService;
+import br.com.cs.ClinicaMedicaNuse.service.AtendimentoService;
 import br.com.cs.ClinicaMedicaNuse.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -18,10 +19,13 @@ public class AuthController {
 
     private final AuthService authService;
     private final AgendamentoService agendamentoService;
+    private final AtendimentoService atendimentoService;
 
-    public AuthController(AuthService authService, AgendamentoService agendamentoService) {
+    public AuthController(AuthService authService, AgendamentoService agendamentoService,
+                          AtendimentoService atendimentoService) {
         this.authService = authService;
         this.agendamentoService = agendamentoService;
+        this.atendimentoService = atendimentoService;
     }
 
     @PostMapping("/login")
@@ -71,6 +75,23 @@ public class AuthController {
     public ResponseEntity<List<AgendamentoResponse>> minhasConsultas(Principal principal) {
         var paciente = authService.buscarPacienteLogado(UsuarioLogado.id(principal));
         return ResponseEntity.ok(AgendamentoResponse.from(agendamentoService.listarPorPaciente(paciente.getId())));
+    }
+
+    /**
+     * O retorno dos atendimentos do paciente logado: o que o médico concluiu
+     * (diagnóstico e conduta), as prescrições e os exames de cada consulta.
+     */
+    @GetMapping("/meus-atendimentos")
+    public ResponseEntity<List<AtendimentoResponse>> meusAtendimentos(Principal principal) {
+        var paciente = authService.buscarPacienteLogado(UsuarioLogado.id(principal));
+        return ResponseEntity.ok(atendimentoService.listarDoPaciente(paciente.getId()));
+    }
+
+    /** O paciente logado cancela uma consulta dele; o horário volta a ficar disponível. */
+    @PutMapping("/minhas-consultas/{id}/cancelar")
+    public ResponseEntity<AgendamentoResponse> cancelarMinhaConsulta(Principal principal, @PathVariable Long id) {
+        var paciente = authService.buscarPacienteLogado(UsuarioLogado.id(principal));
+        return ResponseEntity.ok(AgendamentoResponse.from(agendamentoService.cancelarDoPaciente(paciente, id)));
     }
 
     /** O paciente logado solicita uma consulta; a clínica confirma depois. */

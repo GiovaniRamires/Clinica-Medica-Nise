@@ -24,9 +24,19 @@ public class Medico {
     @Column(nullable = false, length = 80)
     private String especialidade;
 
-    public Medico(String nome, String crm, String especialidade) {
+    /**
+     * Conta de acesso do médico no sistema.
+     * Obrigatória: todo médico precisa de login (perfil MEDICO) para atender,
+     * e cada usuário só pode estar ligado a um médico.
+     */
+    @OneToOne(optional = false)
+    @JoinColumn(name = "usuario_id", unique = true)
+    private Usuario usuario;
+
+    public Medico(String nome, String crm, String especialidade, Usuario usuario) {
         this.nome = nome;
         this.crm = crm;
         this.especialidade = especialidade;
+        this.usuario = usuario;
     }
 }

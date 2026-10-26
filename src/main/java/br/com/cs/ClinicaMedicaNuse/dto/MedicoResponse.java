@@ -9,14 +9,16 @@ public record MedicoResponse(
         Long id,
         String nome,
         String crm,
-        String especialidade
+        String especialidade,
+        Long usuarioId
 ) {
     public static MedicoResponse from(Medico medico) {
         return new MedicoResponse(
                 medico.getId(),
                 medico.getNome(),
                 medico.getCrm(),
-                medico.getEspecialidade());
+                medico.getEspecialidade(),
+                medico.getUsuario().getId());
     }
 
     public static List<MedicoResponse> from(List<Medico> medicos) {

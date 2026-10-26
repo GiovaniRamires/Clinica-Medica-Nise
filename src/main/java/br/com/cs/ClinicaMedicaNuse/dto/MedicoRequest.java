@@ -1,6 +1,7 @@
 package br.com.cs.ClinicaMedicaNuse.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
@@ -18,6 +19,9 @@ public record MedicoRequest(
 
         @NotBlank(message = "A especialidade é obrigatória")
         @Size(max = 80, message = "A especialidade deve ter no máximo 80 caracteres")
-        String especialidade
+        String especialidade,
+
+        @NotNull(message = "O id do usuário é obrigatório")
+        Long usuarioId
 ) {
 }

@@ -67,6 +67,13 @@ class PacienteAutoCadastroTest {
                 .defaultRequest(get("/").header("Authorization", autorizacao)).build();
     }
 
+    /** Médico exige um usuário de perfil MEDICO: cria o login e devolve o id. */
+    private long criarUsuarioMedico() {
+        return usuarioRepository.save(new Usuario(
+                "Dr. House", "house@clinicanise.local",
+                passwordEncoder.encode("senhaDeTeste123"), Usuario.Perfil.MEDICO)).getId();
+    }
+
     private String cadastrarPaciente(String nome, String cpf, String email, String senha) throws Exception {
         return mockMvc().perform(post("/auth/cadastro-paciente")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -128,8 +135,8 @@ class PacienteAutoCadastroTest {
         long medicoId = Long.parseLong(JsonPath.read(mockMvcComAdmin().perform(post("/medicos")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Dr. House","crm":"123456","especialidade":"Clinica Geral"}
-                                """))
+                                {"nome":"Dr. House","crm":"123456","especialidade":"Clinica Geral","usuarioId":%d}
+                                """.formatted(criarUsuarioMedico())))
                 .andReturn().getResponse().getContentAsString(), "$.id").toString());
 
         String corpo = mockMvc().perform(post("/auth/solicitar-agendamento")
@@ -157,8 +164,8 @@ class PacienteAutoCadastroTest {
         long medicoId = Long.parseLong(JsonPath.read(mockMvcComAdmin().perform(post("/medicos")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Dr. House","crm":"123456","especialidade":"Clinica Geral"}
-                                """))
+                                {"nome":"Dr. House","crm":"123456","especialidade":"Clinica Geral","usuarioId":%d}
+                                """.formatted(criarUsuarioMedico())))
                 .andReturn().getResponse().getContentAsString(), "$.id").toString());
 
         mockMvc().perform(post("/auth/solicitar-agendamento")
@@ -179,6 +186,145 @@ class PacienteAutoCadastroTest {
     }
 
     @Test
+    @DisplayName("Paciente cancela a propria consulta e o horario volta a ficar livre; consulta de outro da 404")
+    void pacienteCancelaPropriaConsulta() throws Exception {
+        String tokenCarlos = JsonPath.read(
+                cadastrarPaciente("Carlos Andrade", "12312312312", "carlos@paciente.local", "senhaForte123"),
+                "$.token");
+        String tokenAna = JsonPath.read(
+                cadastrarPaciente("Ana Oliveira", "32132132132", "ana@paciente.local", "senhaForte123"),
+                "$.token");
+
+        long medicoId = Long.parseLong(JsonPath.read(mockMvcComAdmin().perform(post("/medicos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Dr. House","crm":"123456","especialidade":"Clinica Geral","usuarioId":%d}
+                                """.formatted(criarUsuarioMedico())))
+                .andReturn().getResponse().getContentAsString(), "$.id").toString());
+
+        long agendamentoId = Long.parseLong(JsonPath.read(mockMvc().perform(post("/auth/solicitar-agendamento")
+                        .header("Authorization", bearer(tokenCarlos))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"medicoId":%d,"data":"%s","horario":"09:30"}
+                                """.formatted(medicoId, AMANHA)))
+                .andReturn().getResponse().getContentAsString(), "$.id").toString());
+
+        // horario ocupado: a Ana nao consegue pedir o mesmo
+        String pedidoAna = """
+                {"medicoId":%d,"data":"%s","horario":"09:30"}
+                """.formatted(medicoId, AMANHA);
+        mockMvc().perform(post("/auth/solicitar-agendamento")
+                        .header("Authorization", bearer(tokenAna))
+                        .contentType(MediaType.APPLICATION_JSON).content(pedidoAna))
+                .andExpect(status().isConflict());
+
+        // a Ana nao cancela a consulta do Carlos (e nem descobre que ela existe)
+        mockMvc().perform(put("/auth/minhas-consultas/{id}/cancelar", agendamentoId)
+                        .header("Authorization", bearer(tokenAna)))
+                .andExpect(status().isNotFound());
+
+        // o Carlos cancela a dele
+        mockMvc().perform(put("/auth/minhas-consultas/{id}/cancelar", agendamentoId)
+                        .header("Authorization", bearer(tokenCarlos)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.situacao").value("CANCELADO"));
+
+        // horario liberado: agora a Ana consegue
+        mockMvc().perform(post("/auth/solicitar-agendamento")
+                        .header("Authorization", bearer(tokenAna))
+                        .contentType(MediaType.APPLICATION_JSON).content(pedidoAna))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("Paciente ve o retorno do atendimento (diagnostico, prescricao, exame) sem as anotacoes internas")
+    void pacienteVeRetornoDoAtendimento() throws Exception {
+        String tokenCarlos = JsonPath.read(
+                cadastrarPaciente("Carlos Andrade", "12312312312", "carlos@paciente.local", "senhaForte123"),
+                "$.token");
+        String tokenAna = JsonPath.read(
+                cadastrarPaciente("Ana Oliveira", "32132132132", "ana@paciente.local", "senhaForte123"),
+                "$.token");
+
+        long medicoId = Long.parseLong(JsonPath.read(mockMvcComAdmin().perform(post("/medicos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Dr. House","crm":"123456","especialidade":"Clinica Geral","usuarioId":%d}
+                                """.formatted(criarUsuarioMedico())))
+                .andReturn().getResponse().getContentAsString(), "$.id").toString());
+
+        long agendamentoId = Long.parseLong(JsonPath.read(mockMvc().perform(post("/auth/solicitar-agendamento")
+                        .header("Authorization", bearer(tokenCarlos))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"medicoId":%d,"data":"%s","horario":"09:30"}
+                                """.formatted(medicoId, AMANHA)))
+                .andReturn().getResponse().getContentAsString(), "$.id").toString());
+
+        mockMvcComAdmin().perform(put("/agendamentos/{id}/situacao", agendamentoId)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"situacao\":\"AGENDADO\"}"));
+
+        long consultaId = Long.parseLong(JsonPath.read(mockMvcComAdmin().perform(post("/consultas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"agendamentoId":%d,"queixaPrincipal":"Dor de cabeca",
+                                 "observacoesMedicas":"ANOTACAO INTERNA DA EQUIPE",
+                                 "diagnostico":"Enxaqueca","conduta":"Repouso e hidratacao"}
+                                """.formatted(agendamentoId)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "$.id").toString());
+
+        mockMvcComAdmin().perform(post("/prescricoes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"consultaId":%d,"medicamento":"Dipirona","dosagem":"500mg",
+                                 "frequencia":"8/8h","duracao":"5 dias"}
+                                """.formatted(consultaId)))
+                .andExpect(status().isCreated());
+        mockMvcComAdmin().perform(post("/exames")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"consultaId":%d,"nome":"Hemograma"}
+                                """.formatted(consultaId)))
+                .andExpect(status().isCreated());
+
+        String corpo = mockMvc().perform(get("/auth/meus-atendimentos").header("Authorization", bearer(tokenCarlos)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].medico.nome").value("Dr. House"))
+                .andExpect(jsonPath("$[0].diagnostico").value("Enxaqueca"))
+                .andExpect(jsonPath("$[0].conduta").value("Repouso e hidratacao"))
+                .andExpect(jsonPath("$[0].prescricoes[0].medicamento").value("Dipirona"))
+                .andExpect(jsonPath("$[0].exames[0].nome").value("Hemograma"))
+                .andExpect(jsonPath("$[0].exames[0].situacao").value("SOLICITADO"))
+                .andReturn().getResponse().getContentAsString();
+
+        // anotacao interna da equipe e ids de usuario nunca saem para o paciente
+        assertThat(corpo).doesNotContain("observacoesMedicas").doesNotContain("ANOTACAO INTERNA");
+        assertThat(corpo).doesNotContain("usuarioId");
+
+        // outro paciente nao ve nada disso
+        mockMvc().perform(get("/auth/meus-atendimentos").header("Authorization", bearer(tokenAna)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("Meus-atendimentos so para PACIENTE")
+    void meusAtendimentosExigePerfilPaciente() throws Exception {
+        mockMvcComAdmin().perform(get("/auth/meus-atendimentos")).andExpect(status().isForbidden());
+        mockMvc().perform(get("/auth/meus-atendimentos")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Cancelamento pelo paciente exige perfil PACIENTE")
+    void cancelarMinhaConsultaExigePerfilPaciente() throws Exception {
+        mockMvcComAdmin().perform(put("/auth/minhas-consultas/{id}/cancelar", 1L))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("Recepcao confirma a solicitacao: SOLICITADO vira AGENDADO")
     void recepcaoConfirmaSolicitacao() throws Exception {
         String tokenPaciente = JsonPath.read(
@@ -188,8 +334,8 @@ class PacienteAutoCadastroTest {
         long medicoId = Long.parseLong(JsonPath.read(mockMvcComAdmin().perform(post("/medicos")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Dr. House","crm":"123456","especialidade":"Clinica Geral"}
-                                """))
+                                {"nome":"Dr. House","crm":"123456","especialidade":"Clinica Geral","usuarioId":%d}
+                                """.formatted(criarUsuarioMedico())))
                 .andReturn().getResponse().getContentAsString(), "$.id").toString());
 
         long agendamentoId = Long.parseLong(JsonPath.read(mockMvc().perform(post("/auth/solicitar-agendamento")
@@ -236,8 +382,8 @@ class PacienteAutoCadastroTest {
         mockMvcComAdmin().perform(post("/medicos")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"nome":"Dr. House","crm":"123456","especialidade":"Clinica Geral"}
-                        """));
+                        {"nome":"Dr. House","crm":"123456","especialidade":"Clinica Geral","usuarioId":%d}
+                        """.formatted(criarUsuarioMedico())));
 
         mockMvc().perform(get("/medicos").header("Authorization", bearer(tokenPaciente)))
                 .andExpect(status().isOk())

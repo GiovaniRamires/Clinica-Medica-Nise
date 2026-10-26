@@ -2,7 +2,9 @@ package br.com.cs.ClinicaMedicaNuse.service;
 
 import br.com.cs.ClinicaMedicaNuse.dto.MedicoRequest;
 import br.com.cs.ClinicaMedicaNuse.entity.Medico;
+import br.com.cs.ClinicaMedicaNuse.entity.Usuario;
 import br.com.cs.ClinicaMedicaNuse.repository.MedicoRepository;
+import br.com.cs.ClinicaMedicaNuse.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,27 +27,37 @@ public class MedicoServiceTest {
     @Mock
     private MedicoRepository medicoRepository;
 
+    @Mock
+    private UsuarioRepository usuarioRepository;
+
     @InjectMocks
     private MedicoService medicoService;
 
     private MedicoRequest request;
     private Medico medico;
+    private Usuario usuario;
 
     @BeforeEach
     void setUp() {
-        request = new MedicoRequest("Dr. House", "123456", "Cardiologia");
+        usuario = new Usuario("Dr. House", "house@clinicanise.local", "hash", Usuario.Perfil.MEDICO);
+        usuario.setId(10L);
 
-        medico = new Medico("Dr. House", "123456", "Cardiologia");
+        request = new MedicoRequest("Dr. House", "123456", "Cardiologia", 10L);
+
+        medico = new Medico("Dr. House", "123456", "Cardiologia", usuario);
         medico.setId(1L);
     }
 
     @Test
     public void deveCriarMedicoQuandoCrmNaoExiste() {
         when(medicoRepository.existsByCrm("123456")).thenReturn(false);
+        when(medicoRepository.existsByUsuarioId(10L)).thenReturn(false);
+        when(usuarioRepository.findById(10L)).thenReturn(Optional.of(usuario));
         when(medicoRepository.save(any(Medico.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Medico criado = medicoService.criar(request);
 
+        assertSame(usuario, criado.getUsuario());
         assertEquals("Dr. House", criado.getNome());
         assertEquals("123456", criado.getCrm());
         assertEquals("Cardiologia", criado.getEspecialidade());
@@ -55,6 +67,43 @@ public class MedicoServiceTest {
     @Test
     public void naoDeveCriarMedicoComCrmJaExistente() {
         when(medicoRepository.existsByCrm("123456")).thenReturn(true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> medicoService.criar(request));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        verify(medicoRepository, never()).save(any());
+    }
+
+    @Test
+    public void naoDeveCriarMedicoComUsuarioInexistente() {
+        when(medicoRepository.existsByCrm("123456")).thenReturn(false);
+        when(usuarioRepository.findById(10L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> medicoService.criar(request));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        verify(medicoRepository, never()).save(any());
+    }
+
+    @Test
+    public void naoDeveCriarMedicoComUsuarioDeOutroPerfil() {
+        usuario.setPerfil(Usuario.Perfil.RECEPCIONISTA);
+        when(medicoRepository.existsByCrm("123456")).thenReturn(false);
+        when(usuarioRepository.findById(10L)).thenReturn(Optional.of(usuario));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> medicoService.criar(request));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        verify(medicoRepository, never()).save(any());
+    }
+
+    @Test
+    public void naoDeveCriarMedicoComUsuarioJaVinculado() {
+        when(medicoRepository.existsByCrm("123456")).thenReturn(false);
+        when(medicoRepository.existsByUsuarioId(10L)).thenReturn(true);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> medicoService.criar(request));
@@ -95,10 +144,12 @@ public class MedicoServiceTest {
 
     @Test
     public void deveAtualizarMedicoComDadosValidos() {
-        MedicoRequest atualizacao = new MedicoRequest("Dr. Wilson", "654321", "Oncologia");
+        MedicoRequest atualizacao = new MedicoRequest("Dr. Wilson", "654321", "Oncologia", 10L);
 
         when(medicoRepository.findById(1L)).thenReturn(Optional.of(medico));
         when(medicoRepository.existsByCrmAndIdNot("654321", 1L)).thenReturn(false);
+        when(medicoRepository.existsByUsuarioIdAndIdNot(10L, 1L)).thenReturn(false);
+        when(usuarioRepository.findById(10L)).thenReturn(Optional.of(usuario));
         when(medicoRepository.save(any(Medico.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Medico atualizado = medicoService.atualizar(1L, atualizacao);
@@ -111,7 +162,7 @@ public class MedicoServiceTest {
 
     @Test
     public void naoDeveAtualizarParaCrmDeOutroMedico() {
-        MedicoRequest atualizacao = new MedicoRequest("Dr. Wilson", "999999", "Oncologia");
+        MedicoRequest atualizacao = new MedicoRequest("Dr. Wilson", "999999", "Oncologia", 10L);
 
         when(medicoRepository.findById(1L)).thenReturn(Optional.of(medico));
         when(medicoRepository.existsByCrmAndIdNot("999999", 1L)).thenReturn(true);
