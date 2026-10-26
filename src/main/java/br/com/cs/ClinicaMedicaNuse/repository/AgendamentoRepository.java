@@ -17,12 +17,14 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
 
     boolean existsByMedicoIdAndDataAndHorarioAndSituacaoNot(Long medicoId, LocalDate data, LocalTime horario, SituacaoAgendamento situacao);
 
-    /** Mesma regra de agenda cheia, do lado do paciente. */
+
     boolean existsByPacienteIdAndDataAndHorarioAndSituacaoNot(Long pacienteId, LocalDate data, LocalTime horario, SituacaoAgendamento situacao);
 
-    /** Listagem da agenda em ordem cronológica. */
+
     List<Agendamento> findAllByOrderByDataAscHorarioAsc();
 
-    /** Agenda do próprio paciente logado. */
+
     List<Agendamento> findByPacienteIdOrderByDataAscHorarioAsc(Long pacienteId);
+
+    List<Agendamento> findByMedicoIdAndDataAndSituacaoNot(Long medicoId, LocalDate data, SituacaoAgendamento situacao);
 }

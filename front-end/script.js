@@ -820,6 +820,7 @@ async function carregarAgendamentos() {
     preencherSelect(document.getElementById('form-consulta').elements.agendamentoId,
         itens, 'Nenhum agendamento aberto');
     atualizarDashboardSeAberto();
+    atualizarSino();
 }
 
 function mostrarAgendamentos() {
@@ -883,9 +884,116 @@ async function salvarAgendamento(evento) {
         });
         mostrarToast('Agendamento criado.', 'ok');
         form.reset();
+        atualizarHorariosAgendamento();
         await carregarAgendamentos();
     } catch (erro) {
         mostrarErros(form, erro);
+    }
+}
+
+async function atualizarHorariosAgendamento() {
+    const form = document.getElementById('form-agendamento');
+    const medicoId = form.elements.medicoId.value;
+    const data = form.elements.data.value;
+    const caixa = document.getElementById('age-horarios');
+    const info = document.getElementById('age-horarios-info');
+    const hidden = document.getElementById('age-horario');
+
+    hidden.value = '';
+    info.textContent = '';
+
+    if (!medicoId || !data) {
+        caixa.innerHTML = '<p class="dica">Escolha o médico e a data para ver os horários.</p>';
+        return;
+    }
+
+    try {
+        const agenda = await requisicao('/agendamentos/horarios-disponiveis?medicoId=' + medicoId + '&data=' + data);
+        if (!agenda.horarios.length) {
+            caixa.innerHTML = '<p class="dica">Nenhum horário nesse dia.</p>';
+            return;
+        }
+        caixa.innerHTML = agenda.horarios.map(h =>
+            '<button type="button" class="slot-horario" data-hora="' + h.horario + '"' +
+            (h.livre ? '' : ' disabled') + '>' + h.horario + '</button>'
+        ).join('');
+        info.textContent = agenda.livres + ' de ' + agenda.totalSlots +
+            ' horários livres · consultas de ' + agenda.duracaoMinutos +
+            ' min, com intervalo mínimo de ' + agenda.duracaoMinutos + ' min entre agendamentos.';
+
+        caixa.querySelectorAll('.slot-horario:not(:disabled)').forEach(botao => {
+            botao.addEventListener('click', () => {
+                caixa.querySelectorAll('.slot-horario').forEach(b => b.classList.remove('ativo'));
+                botao.classList.add('ativo');
+                hidden.value = botao.dataset.hora;
+            });
+        });
+    } catch (erro) {
+        caixa.innerHTML = '<p class="dica">Não foi possível carregar os horários.</p>';
+        mostrarToast(erro.mensagem, 'erro');
+    }
+}
+
+function coletarNotificacoes() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const pendentes = agendamentos.filter(a => a.situacao === 'SOLICITADO');
+    const deHoje = agendamentos.filter(a => a.data === hoje && SITUACOES_ABERTAS.includes(a.situacao));
+    return {pendentes, deHoje, total: pendentes.length + deHoje.length};
+}
+
+function atualizarSino() {
+    const contador = document.getElementById('sino-contador');
+    if (ehPaciente()) {
+        contador.classList.add('oculto');
+        return;
+    }
+    const total = coletarNotificacoes().pendentes.length;
+    if (total > 0) {
+        contador.textContent = total > 9 ? '9+' : String(total);
+        contador.classList.remove('oculto');
+    } else {
+        contador.classList.add('oculto');
+    }
+}
+
+function montarPainelSino() {
+    const corpo = document.getElementById('sino-painel-corpo');
+    const {pendentes, deHoje, total} = coletarNotificacoes();
+
+    if (total === 0) {
+        corpo.innerHTML = '<p class="sino-vazio">Nada por aqui. Tudo em dia!</p>';
+        return;
+    }
+
+    let html = '';
+    if (pendentes.length > 0) {
+        html += '<p class="sino-grupo-titulo">Solicitações pendentes</p>';
+        html += pendentes.map(a =>
+            '<div class="sino-item"><strong>' + esc(a.paciente.nome) + '</strong> pediu horário com ' +
+            esc(a.medico.nome) + '<div class="sino-item-sub">' + esc(formatarData(a.data)) + ' · ' + esc(a.horario) + '</div></div>'
+        ).join('');
+    }
+    if (deHoje.length > 0) {
+        html += '<p class="sino-grupo-titulo">Agendamentos de hoje</p>';
+        html += deHoje.map(a =>
+            '<div class="sino-item"><strong>' + esc(a.horario) + '</strong> · ' + esc(a.paciente.nome) +
+            '<div class="sino-item-sub">' + esc(a.medico.nome) + ' · ' + esc(a.situacao) + '</div></div>'
+        ).join('');
+    }
+    corpo.innerHTML = html;
+}
+
+function alternarSino() {
+    const painel = document.getElementById('sino-painel');
+    const botao = document.getElementById('botao-sino');
+    const aberto = !painel.classList.contains('oculto');
+    if (aberto) {
+        painel.classList.add('oculto');
+        botao.setAttribute('aria-expanded', 'false');
+    } else {
+        montarPainelSino();
+        painel.classList.remove('oculto');
+        botao.setAttribute('aria-expanded', 'true');
     }
 }
 
@@ -948,7 +1056,6 @@ async function salvarConsulta(evento) {
 
     try {
         if (id) {
-            // Na edição o agendamento de origem não muda (ConsultaAtualizacaoRequest).
             await requisicao('/consultas/' + id, 'PUT', {
                 queixaPrincipal: dados.queixaPrincipal,
                 observacoesMedicas: dados.observacoesMedicas,
@@ -956,19 +1063,22 @@ async function salvarConsulta(evento) {
                 conduta: dados.conduta
             });
             mostrarToast('Consulta atualizada.', 'ok');
+            cancelarEdicaoConsulta();
+            await carregarConsultas();
+            await carregarAgendamentos();
         } else {
-            await requisicao('/consultas', 'POST', {
+            const criada = await requisicao('/consultas', 'POST', {
                 agendamentoId: Number(dados.agendamentoId),
                 queixaPrincipal: dados.queixaPrincipal,
                 observacoesMedicas: dados.observacoesMedicas,
                 diagnostico: dados.diagnostico,
                 conduta: dados.conduta
             });
-            mostrarToast('Atendimento registrado.', 'ok');
+            mostrarToast('Atendimento registrado. Adicione as prescrições abaixo.', 'ok');
+            await carregarConsultas();
+            await carregarAgendamentos();
+            editarConsulta(criada.id);
         }
-        cancelarEdicaoConsulta();
-        await carregarConsultas();
-        await carregarAgendamentos();   // o agendamento virou REALIZADO
     } catch (erro) {
         mostrarErros(form, erro);
     }
@@ -990,6 +1100,7 @@ function editarConsulta(id) {
 
     document.getElementById('titulo-form-consulta').textContent = 'Editando consulta';
     document.getElementById('cancelar-consulta').classList.remove('oculto');
+    abrirPrescricoes(consulta.id);
     form.scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
@@ -1003,6 +1114,118 @@ function cancelarEdicaoConsulta() {
 
     document.getElementById('titulo-form-consulta').textContent = 'Registrar atendimento';
     document.getElementById('cancelar-consulta').classList.add('oculto');
+    fecharPrescricoes();
+}
+
+let prescricoes = [];
+
+async function abrirPrescricoes(consultaId) {
+    document.getElementById('form-prescricao').elements.consultaId.value = consultaId;
+    document.getElementById('cartao-prescricoes').classList.remove('oculto');
+    cancelarEdicaoPrescricao();
+    await carregarPrescricoes(consultaId);
+}
+
+function fecharPrescricoes() {
+    document.getElementById('cartao-prescricoes').classList.add('oculto');
+    document.getElementById('form-prescricao').elements.consultaId.value = '';
+    prescricoes = [];
+}
+
+async function carregarPrescricoes(consultaId) {
+    prescricoes = await requisicao('/prescricoes?consultaId=' + consultaId);
+    mostrarPrescricoes();
+}
+
+function mostrarPrescricoes() {
+    document.getElementById('contador-prescricoes').textContent = prescricoes.length;
+    const tabela = document.getElementById('tabela-prescricoes');
+
+    if (prescricoes.length === 0) {
+        tabela.innerHTML = '<tr><td class="vazio" colspan="5">Nenhuma prescrição nesta consulta.</td></tr>';
+        return;
+    }
+
+    tabela.innerHTML = prescricoes.map(p => `
+        <tr>
+            <td>${esc(p.medicamento)}</td>
+            <td>${esc(p.dosagem)}</td>
+            <td>${esc(p.frequencia)}</td>
+            <td>${esc(p.duracao || '—')}</td>
+            <td><div class="acoes-linha">
+                <button class="botao botao--secundario botao--pequeno" onclick="editarPrescricao(${p.id})">Editar</button>
+                <button class="botao botao--perigo botao--pequeno" onclick="excluirPrescricao(${p.id})">Excluir</button>
+            </div></td>
+        </tr>
+    `).join('');
+}
+
+async function salvarPrescricao(evento) {
+    evento.preventDefault();
+    const form = evento.target;
+    limparErros(form);
+    if (!form.reportValidity()) return;
+
+    const dados = lerFormulario(form);
+    const id = dados.id;
+    const corpo = {
+        consultaId: Number(dados.consultaId),
+        medicamento: dados.medicamento,
+        dosagem: dados.dosagem,
+        frequencia: dados.frequencia,
+        duracao: dados.duracao,
+        observacoes: dados.observacoes
+    };
+
+    try {
+        if (id) {
+            await requisicao('/prescricoes/' + id, 'PUT', corpo);
+            mostrarToast('Prescrição atualizada.', 'ok');
+        } else {
+            await requisicao('/prescricoes', 'POST', corpo);
+            mostrarToast('Prescrição adicionada.', 'ok');
+        }
+        cancelarEdicaoPrescricao();
+        await carregarPrescricoes(dados.consultaId);
+    } catch (erro) {
+        mostrarErros(form, erro);
+    }
+}
+
+function editarPrescricao(id) {
+    const p = prescricoes.find(item => item.id === id);
+    const form = document.getElementById('form-prescricao');
+
+    form.elements.id.value = p.id;
+    form.elements.medicamento.value = p.medicamento || '';
+    form.elements.dosagem.value = p.dosagem || '';
+    form.elements.frequencia.value = p.frequencia || '';
+    form.elements.duracao.value = p.duracao || '';
+    form.elements.observacoes.value = p.observacoes || '';
+
+    document.getElementById('cancelar-prescricao').classList.remove('oculto');
+    form.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+function cancelarEdicaoPrescricao() {
+    const form = document.getElementById('form-prescricao');
+    const consultaId = form.elements.consultaId.value;
+    form.reset();
+    form.elements.consultaId.value = consultaId;
+    limparErros(form);
+    document.getElementById('cancelar-prescricao').classList.add('oculto');
+}
+
+async function excluirPrescricao(id) {
+    if (!confirm('Excluir esta prescrição?')) return;
+    const consultaId = document.getElementById('form-prescricao').elements.consultaId.value;
+    try {
+        await requisicao('/prescricoes/' + id, 'DELETE');
+        mostrarToast('Prescrição excluída.', 'ok');
+        await carregarPrescricoes(consultaId);
+    } catch (erro) {
+        mostrarToast(erro.mensagem, 'erro');
+    }
 }
 
 
@@ -1225,6 +1448,18 @@ async function iniciar() {
         document.getElementById('aplicacao').classList.remove('menu-aberto');
     });
 
+    document.getElementById('botao-sino').addEventListener('click', evento => {
+        evento.stopPropagation();
+        alternarSino();
+    });
+    document.addEventListener('click', evento => {
+        const container = document.querySelector('.sino-container');
+        if (container && !container.contains(evento.target)) {
+            document.getElementById('sino-painel').classList.add('oculto');
+            document.getElementById('botao-sino').setAttribute('aria-expanded', 'false');
+        }
+    });
+
     // Formulários
     document.getElementById('form-login').addEventListener('submit', entrar);
     document.getElementById('botao-sair').addEventListener('click', sair);
@@ -1235,7 +1470,11 @@ async function iniciar() {
     document.getElementById('form-paciente').addEventListener('submit', salvarPaciente);
     document.getElementById('form-medico').addEventListener('submit', salvarMedico);
     document.getElementById('form-agendamento').addEventListener('submit', salvarAgendamento);
+    document.getElementById('age-medico').addEventListener('change', atualizarHorariosAgendamento);
+    document.getElementById('age-data').addEventListener('change', atualizarHorariosAgendamento);
     document.getElementById('form-consulta').addEventListener('submit', salvarConsulta);
+    document.getElementById('form-prescricao').addEventListener('submit', salvarPrescricao);
+    document.getElementById('cancelar-prescricao').addEventListener('click', cancelarEdicaoPrescricao);
     document.getElementById('form-usuario').addEventListener('submit', salvarUsuario);
     document.getElementById('form-senha').addEventListener('submit', trocarSenha);
     document.getElementById('cancelar-paciente').addEventListener('click', cancelarEdicaoPaciente);

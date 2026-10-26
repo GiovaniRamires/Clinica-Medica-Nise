@@ -148,7 +148,16 @@
                 </div>
             </div>
             <div class="topo-direita">
-                <button class="botao-sino" aria-label="Notificações">🔔</button>
+                <div class="sino-container">
+                    <button class="botao-sino" id="botao-sino" aria-label="Notificações" aria-expanded="false">
+                        🔔
+                        <span class="sino-contador oculto" id="sino-contador">0</span>
+                    </button>
+                    <div class="sino-painel oculto" id="sino-painel">
+                        <div class="sino-painel-cabecalho">Notificações</div>
+                        <div class="sino-painel-corpo" id="sino-painel-corpo"></div>
+                    </div>
+                </div>
                 <div class="avatar" id="usuario-avatar"></div>
             </div>
         </header>
@@ -411,11 +420,15 @@
                                     <input class="entrada" type="date" id="age-data" name="data" required>
                                     <p class="erro-campo oculto"></p>
                                 </div>
-                                <div class="campo">
-                                    <label class="rotulo" for="age-horario">Horário</label>
-                                    <input class="entrada" type="time" id="age-horario" name="horario" required>
-                                    <p class="erro-campo oculto"></p>
+                            </div>
+                            <div class="campo">
+                                <label class="rotulo">Horário</label>
+                                <input type="hidden" id="age-horario" name="horario" required>
+                                <div class="grade-horarios" id="age-horarios">
+                                    <p class="dica">Escolha o médico e a data para ver os horários.</p>
                                 </div>
+                                <p class="dica" id="age-horarios-info"></p>
+                                <p class="erro-campo oculto"></p>
                             </div>
                             <div class="campo">
                                 <label class="rotulo" for="age-observacoes">Observações</label>
@@ -494,6 +507,66 @@
                                 <button type="button" id="cancelar-consulta" class="botao botao--secundario oculto">Cancelar edição</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+
+                <div class="cartao oculto" id="cartao-prescricoes">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Prescrições da consulta</h2>
+                        <span class="selo selo--neutro" id="contador-prescricoes"></span>
+                    </div>
+                    <div class="cartao-corpo">
+                        <form id="form-prescricao" novalidate>
+                            <input type="hidden" name="id">
+                            <input type="hidden" name="consultaId">
+                            <div class="grade-campos">
+                                <div class="campo">
+                                    <label class="rotulo" for="pre-medicamento">Medicamento</label>
+                                    <input class="entrada" type="text" id="pre-medicamento" name="medicamento" maxlength="200" required>
+                                    <p class="erro-campo oculto"></p>
+                                </div>
+                                <div class="campo">
+                                    <label class="rotulo" for="pre-dosagem">Dosagem</label>
+                                    <input class="entrada" type="text" id="pre-dosagem" name="dosagem" maxlength="100" placeholder="ex.: 500 mg" required>
+                                    <p class="erro-campo oculto"></p>
+                                </div>
+                            </div>
+                            <div class="grade-campos">
+                                <div class="campo">
+                                    <label class="rotulo" for="pre-frequencia">Frequência</label>
+                                    <input class="entrada" type="text" id="pre-frequencia" name="frequencia" maxlength="100" placeholder="ex.: 8 em 8 horas" required>
+                                    <p class="erro-campo oculto"></p>
+                                </div>
+                                <div class="campo">
+                                    <label class="rotulo" for="pre-duracao">Duração</label>
+                                    <input class="entrada" type="text" id="pre-duracao" name="duracao" maxlength="100" placeholder="ex.: 7 dias">
+                                    <p class="erro-campo oculto"></p>
+                                </div>
+                            </div>
+                            <div class="campo">
+                                <label class="rotulo" for="pre-observacoes">Observações</label>
+                                <textarea class="entrada entrada--area" id="pre-observacoes" name="observacoes" rows="2" maxlength="1000"></textarea>
+                                <p class="erro-campo oculto"></p>
+                            </div>
+                            <div class="linha-acoes">
+                                <button type="submit" class="botao botao--primario">Adicionar prescrição</button>
+                                <button type="button" id="cancelar-prescricao" class="botao botao--secundario oculto">Cancelar edição</button>
+                            </div>
+                        </form>
+                        <div class="tabela-scroll" style="margin-top:16px">
+                            <table class="tabela">
+                                <thead>
+                                <tr>
+                                    <th>Medicamento</th>
+                                    <th>Dosagem</th>
+                                    <th>Frequência</th>
+                                    <th>Duração</th>
+                                    <th class="col-direita">Ações</th>
+                                </tr>
+                                </thead>
+                                <tbody id="tabela-prescricoes"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 

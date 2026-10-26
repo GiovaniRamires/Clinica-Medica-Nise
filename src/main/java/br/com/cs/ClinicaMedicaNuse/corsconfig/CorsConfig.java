@@ -33,14 +33,16 @@ public class CorsConfig {
              */
             @Override
             public void addResourceHandlers(ResourceHandlerRegistry registry) {
+                String pasta = java.nio.file.Paths.get("front-end").toAbsolutePath().toUri().toString();
                 registry.addResourceHandler("/app/**")
-                        .addResourceLocations("file:front-end/");
+                        .addResourceLocations(pasta);
             }
 
-            /** Atalho: a raiz abre a interface. */
             @Override
             public void addViewControllers(ViewControllerRegistry registry) {
                 registry.addRedirectViewController("/", "/app/index.html");
+                registry.addRedirectViewController("/app/", "/app/index.html");
+                registry.addRedirectViewController("/app", "/app/index.html");
             }
         };
     }
