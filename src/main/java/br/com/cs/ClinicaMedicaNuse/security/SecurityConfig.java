@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/pacientes/*/prontuario").hasAnyRole("MEDICO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.GET, "/pacientes/*/consultas").hasAnyRole("MEDICO", "ADMINISTRADOR")
                         .requestMatchers("/exames/**").hasAnyRole("MEDICO", "ADMINISTRADOR")
+                        .requestMatchers("/prescricoes/**").hasAnyRole("MEDICO", "ADMINISTRADOR")
 
                         // Cadastro de usuários do sistema é só do administrador
                         .requestMatchers("/usuarios/**").hasRole("ADMINISTRADOR")

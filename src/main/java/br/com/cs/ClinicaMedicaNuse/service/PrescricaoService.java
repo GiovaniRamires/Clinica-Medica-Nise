@@ -25,7 +25,7 @@ public PrescricaoService(PrescricaoRepository prescricaoRepository, ConsultaRepo
 
     @Transactional
     public Prescricao criar (PrescricaoRequest request){
-    var consulta = consultaRepository.findById(request.consultaId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Consulta id: " + request.consultaId() + "não encontrado"));
+    var consulta = consultaRepository.findById(request.consultaId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Consulta id: " + request.consultaId() + " não encontrada"));
 
     var prescriacao = new Prescricao(
             consulta,

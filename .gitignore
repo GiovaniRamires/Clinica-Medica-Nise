@@ -34,3 +34,7 @@ build/
 
 ### Kiro ###
 .kiro/
+
+### Logs ###
+*.log
+log-run.txt
