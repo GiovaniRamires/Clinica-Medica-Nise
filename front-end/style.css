@@ -389,6 +389,25 @@ table { border-collapse: collapse; width: 100%; }
 .selo--AUSENTE { background: #fffbeb; color: #d97706; }
 .selo--CANCELADO { background: #fef2f2; color: #dc2626; }
 
+/* ============================ filtro de exames ============================ */
+.exames-filtros {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
+.filtro-pendentes {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #64748b;
+    cursor: pointer;
+    user-select: none;
+}
+.filtro-pendentes input {
+    cursor: pointer;
+}
+
 /* ================================ tabelas ================================ */
 .tabela-scroll { overflow-x: auto; }
 .tabela th {
