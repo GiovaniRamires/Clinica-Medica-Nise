@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -25,6 +26,14 @@ public class AgendamentoService {
     private static final LocalTime ABERTURA = LocalTime.of(8, 0);
     private static final LocalTime FECHAMENTO = LocalTime.of(18, 0);
     private static final int DURACAO_MINUTOS = 30;
+
+    /**
+     * Situações em que o agendamento deixa de ocupar o horário: cancelado
+     * (pela clínica ou pelo paciente) ou paciente que faltou. Qualquer outra
+     * situação segura o horário do médico e do paciente.
+     */
+    static final List<SituacaoAgendamento> LIBERAM_HORARIO =
+            List.of(SituacaoAgendamento.CANCELADO, SituacaoAgendamento.AUSENTE);
 
     private final AgendamentoRepository agendamentoRepository;
     private final PacienteService pacienteService;
@@ -59,14 +68,14 @@ public class AgendamentoService {
     private void checarConflitoDeHorario(Long medicoId, Long pacienteId, LocalDate data, LocalTime horario) {
         validarHorarioNaGrade(horario);
 
-        boolean horarioOcupado = agendamentoRepository.existsByMedicoIdAndDataAndHorarioAndSituacaoNot(
-                medicoId, data, horario, SituacaoAgendamento.CANCELADO);
+        boolean horarioOcupado = agendamentoRepository.existsByMedicoIdAndDataAndHorarioAndSituacaoNotIn(
+                medicoId, data, horario, LIBERAM_HORARIO);
         if (horarioOcupado) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "O médico já possui um agendamento nesse dia e horário");
         }
 
-        boolean pacienteOcupado = agendamentoRepository.existsByPacienteIdAndDataAndHorarioAndSituacaoNot(
-                pacienteId, data, horario, SituacaoAgendamento.CANCELADO);
+        boolean pacienteOcupado = agendamentoRepository.existsByPacienteIdAndDataAndHorarioAndSituacaoNotIn(
+                pacienteId, data, horario, LIBERAM_HORARIO);
         if (pacienteOcupado) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "O paciente já possui um agendamento nesse dia e horário");
         }
@@ -85,7 +94,7 @@ public class AgendamentoService {
         medicoService.buscarMedicoPorId(medicoId);
 
         Set<LocalTime> ocupados = new HashSet<>();
-        for (Agendamento a : agendamentoRepository.findByMedicoIdAndDataAndSituacaoNot(medicoId, data, SituacaoAgendamento.CANCELADO)) {
+        for (Agendamento a : agendamentoRepository.findByMedicoIdAndDataAndSituacaoNotIn(medicoId, data, LIBERAM_HORARIO)) {
             ocupados.add(a.getHorario());
         }
 
@@ -110,6 +119,25 @@ public class AgendamentoService {
     public Agendamento buscarAgendamentosPorId(Long id) {
         return agendamentoRepository.findById(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Agendamento id: " + id + " não encontrado"));
+    }
+
+    /**
+     * O paciente cancela uma consulta dele. Agendamento de outro paciente
+     * responde 404 (não revela que existe). Ao cancelar, o horário volta a
+     * ficar livre para o médico e para qualquer outro paciente.
+     */
+    public Agendamento cancelarDoPaciente(Paciente paciente, Long agendamentoId) {
+        var agendamento = buscarAgendamentosPorId(agendamentoId);
+
+        if (!agendamento.getPaciente().getId().equals(paciente.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Agendamento id: " + agendamentoId + " não encontrado");
+        }
+        if (LocalDateTime.of(agendamento.getData(), agendamento.getHorario()).isBefore(LocalDateTime.now())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Não é possível cancelar uma consulta que já passou");
+        }
+        return alterarSituacao(agendamentoId, SituacaoAgendamento.CANCELADO);
     }
 
     public Agendamento marcarComoRealizado(Long id) {

@@ -539,3 +539,11 @@ table { border-collapse: collapse; width: 100%; }
     cursor: not-allowed;
     text-decoration: line-through;
 }
+
+
+/* ===== Meus atendimentos (paciente) ===== */
+.atend-bloco { margin-bottom: 14px; }
+.atend-bloco:last-child { margin-bottom: 0; }
+.atend-texto { font-size: 13px; color: #334155; white-space: pre-wrap; }
+.atend-lista { margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: #334155; }
+.atend-lista li { margin-bottom: 6px; }

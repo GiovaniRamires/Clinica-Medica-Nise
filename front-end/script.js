@@ -308,6 +308,7 @@ async function carregarTudo() {
         if (ehPaciente()) {
             await carregarListaDeMedicosParaPaciente();
             await carregarMinhasConsultas();
+            await carregarMeusAtendimentos();
             return;
         }
         await carregarPacientes();
@@ -388,18 +389,86 @@ async function carregarMinhasConsultas() {
     const tabela = document.getElementById('tabela-minhas-consultas');
 
     if (minhas.length === 0) {
-        tabela.innerHTML = '<tr><td class="vazio" colspan="4">Você ainda não tem consultas marcadas.</td></tr>';
+        tabela.innerHTML = '<tr><td class="vazio" colspan="5">Você ainda não tem consultas marcadas.</td></tr>';
         return;
     }
 
-    tabela.innerHTML = minhas.map(a => `
+    const agora = new Date();
+    tabela.innerHTML = minhas.map(a => {
+        // Só dá para cancelar o que ainda está de pé e ainda não aconteceu.
+        const aindaVale = ['SOLICITADO', 'AGENDADO', 'CONFIRMADO'].includes(a.situacao);
+        const futura = new Date(a.data + 'T' + a.horario) > agora;
+        const acao = aindaVale && futura
+            ? `<button class="botao botao--perigo botao--pequeno" onclick="cancelarMinhaConsulta(${a.id})">Cancelar</button>`
+            : '—';
+        return `
         <tr>
             <td>${esc(formatarData(a.data))}</td>
             <td>${esc(a.horario)}</td>
             <td>${esc(a.medico.nome)} (${esc(a.medico.especialidade)})</td>
             <td><span class="selo selo--${esc(a.situacao)}">${esc(a.situacao)}</span></td>
-        </tr>
-    `).join('');
+            <td><div class="acoes-linha">${acao}</div></td>
+        </tr>`;
+    }).join('');
+}
+
+/**
+ * O retorno dos atendimentos do paciente: diagnóstico, conduta, prescrições e
+ * exames de cada consulta realizada. As anotações internas da equipe não vêm da API.
+ */
+async function carregarMeusAtendimentos() {
+    const atendimentos = await requisicao('/auth/meus-atendimentos');
+    document.getElementById('contador-meus-atendimentos').textContent = atendimentos.length;
+    const lista = document.getElementById('lista-atendimentos');
+
+    if (atendimentos.length === 0) {
+        lista.innerHTML = `<div class="cartao"><div class="cartao-corpo">
+            <p class="vazio">Você ainda não tem atendimentos realizados. Quando uma consulta for concluída, o retorno do médico aparece aqui.</p>
+        </div></div>`;
+        return;
+    }
+
+    const bloco = (rotulo, valor) => valor
+        ? `<div class="atend-bloco"><p class="ficha-rotulo">${rotulo}</p><p class="atend-texto">${esc(valor)}</p></div>`
+        : '';
+
+    lista.innerHTML = atendimentos.map(a => {
+        const prescricoes = a.prescricoes.length === 0 ? '' : `
+            <div class="atend-bloco"><p class="ficha-rotulo">Medicamentos receitados</p>
+                <ul class="atend-lista">${a.prescricoes.map(p => `
+                    <li><strong>${esc(p.medicamento)}</strong> — ${esc(p.dosagem)}, ${esc(p.frequencia)}${p.duracao ? ', por ' + esc(p.duracao) : ''}${p.observacoes ? `<br><span class="item-lista-sub">${esc(p.observacoes)}</span>` : ''}</li>`).join('')}
+                </ul></div>`;
+        const exames = a.exames.length === 0 ? '' : `
+            <div class="atend-bloco"><p class="ficha-rotulo">Exames</p>
+                <ul class="atend-lista">${a.exames.map(e => `
+                    <li><strong>${esc(e.nome)}</strong> <span class="selo selo--${esc(e.situacao)}">${esc(e.situacao)}</span>${e.resultado ? `<br><span class="atend-texto">${esc(e.resultado)}</span>` : ''}</li>`).join('')}
+                </ul></div>`;
+        return `
+            <div class="cartao">
+                <div class="cartao-cabecalho">
+                    <h3 class="cartao-titulo">${esc(formatarData(a.data))} · ${esc(a.horario)} — ${esc(a.medico.nome)} (${esc(a.medico.especialidade)})</h3>
+                </div>
+                <div class="cartao-corpo">
+                    ${bloco('Motivo da consulta', a.queixaPrincipal)}
+                    ${bloco('Diagnóstico', a.diagnostico)}
+                    ${bloco('Orientações do médico', a.conduta)}
+                    ${prescricoes}
+                    ${exames}
+                </div>
+            </div>`;
+    }).join('');
+}
+
+/** O paciente cancela a própria consulta; o horário volta a ficar livre para outros. */
+async function cancelarMinhaConsulta(id) {
+    if (!confirm('Cancelar esta consulta? O horário ficará livre para outras pessoas.')) return;
+    try {
+        await requisicao('/auth/minhas-consultas/' + id + '/cancelar', 'PUT');
+        mostrarToast('Consulta cancelada.', 'ok');
+        await carregarMinhasConsultas();
+    } catch (erro) {
+        mostrarToast(erro.mensagem, 'erro');
+    }
 }
 
 async function solicitarConsulta(evento) {
@@ -558,8 +627,10 @@ async function criarDadosDemonstracao() {
 
     try {
         const medicosSeed = [
-            {nome: 'Dra. Erika Miranda', crm: '111111/SP', especialidade: 'Cardiologia'},
-            {nome: 'Dr. Rafael Nunes', crm: '222222/SP', especialidade: 'Clínica Geral'}
+            {nome: 'Dra. Erika Miranda', crm: '111111/SP', especialidade: 'Cardiologia',
+                email: 'erika.miranda@clinicanise.local'},
+            {nome: 'Dr. Rafael Nunes', crm: '222222/SP', especialidade: 'Clínica Geral',
+                email: 'rafael.nunes@clinicanise.local'}
         ];
         const pacientesSeed = [
             {nome: 'João Silva', cpf: '11111111111', convenio: 'Unimed', alergias: 'Dipirona', prontuario: 'Hipertenso, uso continuo de losartana.'},
@@ -570,7 +641,17 @@ async function criarDadosDemonstracao() {
 
         const idsMedicos = [];
         for (const m of medicosSeed) {
-            const criado = await requisicao('/medicos', 'POST', m);
+            // Todo médico precisa de um usuário (perfil MEDICO): cria o login antes,
+            // ou reaproveita o que já existir com esse e-mail.
+            let usuario = usuarios.find(u => u.email === m.email);
+            if (!usuario) {
+                usuario = await requisicao('/usuarios', 'POST', {
+                    nome: m.nome, email: m.email, senha: 'medico1234', perfil: 'MEDICO'
+                });
+            }
+            const criado = await requisicao('/medicos', 'POST', {
+                nome: m.nome, crm: m.crm, especialidade: m.especialidade, usuarioId: usuario.id
+            });
             idsMedicos.push(criado.id);
         }
 
@@ -718,7 +799,28 @@ async function carregarMedicos() {
     const itens = medicos.map(m => ({valor: m.id, texto: m.nome + ' — ' + m.especialidade}));
     preencherSelect(document.getElementById('form-agendamento').elements.medicoId,
         itens, 'Nenhum médico cadastrado');
+    atualizarSelectUsuariosMedico();
     atualizarDashboardSeAberto();
+}
+
+/**
+ * Monta o select "Usuário (login)" do formulário de médico: só usuários com
+ * perfil MEDICO que ainda não estão ligados a nenhum médico (mais o do médico
+ * em edição, para ele continuar selecionável).
+ */
+function atualizarSelectUsuariosMedico() {
+    if (!ehAdministrador()) return;
+    const select = document.getElementById('med-usuario');
+    const idEmEdicao = Number(document.getElementById('form-medico').elements.id.value) || null;
+    const usuarioDoEditado = idEmEdicao
+        ? (medicos.find(m => m.id === idEmEdicao) || {}).usuarioId
+        : null;
+    const emUso = new Set(medicos.map(m => m.usuarioId));
+
+    const itens = usuarios
+        .filter(u => u.perfil === 'MEDICO' && (!emUso.has(u.id) || u.id === usuarioDoEditado))
+        .map(u => ({valor: u.id, texto: u.nome + ' — ' + u.email}));
+    preencherSelect(select, itens, 'Nenhum usuário Médico disponível — crie um na aba Usuários');
 }
 
 function mostrarMedicos() {
@@ -726,7 +828,7 @@ function mostrarMedicos() {
     const tabela = document.getElementById('tabela-medicos');
 
     if (medicos.length === 0) {
-        tabela.innerHTML = '<tr><td class="vazio" colspan="4">Nenhum médico cadastrado ainda.</td></tr>';
+        tabela.innerHTML = '<tr><td class="vazio" colspan="5">Nenhum médico cadastrado ainda.</td></tr>';
         return;
     }
 
@@ -736,11 +838,16 @@ function mostrarMedicos() {
             ? `<button class="botao botao--secundario botao--pequeno" onclick="editarMedico(${medico.id})">Editar</button>
                <button class="botao botao--perigo botao--pequeno" onclick="excluirMedico(${medico.id})">Excluir</button>`
             : '—';
+        // A coluna do login só existe para o administrador (é ele quem lê /usuarios).
+        const login = ehAdministrador()
+            ? `<td>${esc((usuarios.find(u => u.id === medico.usuarioId) || {}).email || '—')}</td>`
+            : '';
         return `
             <tr>
                 <td>${esc(medico.nome)}</td>
                 <td>${esc(medico.crm)}</td>
                 <td>${esc(medico.especialidade)}</td>
+                ${login}
                 <td><div class="acoes-linha">${acoes}</div></td>
             </tr>
         `;
@@ -756,6 +863,13 @@ async function salvarMedico(evento) {
     const dados = lerFormulario(form);
     const id = dados.id;
     delete dados.id;
+    // Médico sem usuário não existe: o back-end também recusa (400), mas barramos aqui antes.
+    if (!dados.usuarioId) {
+        mostrarErros(form, {mensagem: 'Selecione o usuário do médico.',
+            campos: [{campo: 'usuarioId', mensagem: 'Selecione o usuário (login) do médico'}]});
+        return;
+    }
+    dados.usuarioId = Number(dados.usuarioId);
 
     try {
         if (id) {
@@ -780,6 +894,8 @@ function editarMedico(id) {
     form.elements.nome.value = medico.nome || '';
     form.elements.crm.value = medico.crm || '';
     form.elements.especialidade.value = medico.especialidade || '';
+    atualizarSelectUsuariosMedico();
+    form.elements.usuarioId.value = medico.usuarioId || '';
 
     document.getElementById('titulo-form-medico').textContent = 'Editando médico';
     document.getElementById('cancelar-medico').classList.remove('oculto');
@@ -789,7 +905,9 @@ function editarMedico(id) {
 function cancelarEdicaoMedico() {
     const form = document.getElementById('form-medico');
     form.reset();
+    form.elements.id.value = '';   // reset() não limpa <input type="hidden">
     limparErros(form);
+    atualizarSelectUsuariosMedico();
     document.getElementById('titulo-form-medico').textContent = 'Novo médico';
     document.getElementById('cancelar-medico').classList.add('oculto');
 }
@@ -1422,6 +1540,8 @@ async function mostrarProntuario(pacienteId) {
 async function carregarUsuarios() {
     usuarios = await requisicao('/usuarios');
     mostrarUsuarios();
+    atualizarSelectUsuariosMedico();
+    mostrarMedicos();   // a coluna "Usuário" da tabela de médicos depende desta lista
 }
 
 function mostrarUsuarios() {

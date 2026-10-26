@@ -3,6 +3,7 @@ package br.com.cs.ClinicaMedicaNuse.service;
 import br.com.cs.ClinicaMedicaNuse.dto.UsuarioAtualizacaoRequest;
 import br.com.cs.ClinicaMedicaNuse.dto.UsuarioRequest;
 import br.com.cs.ClinicaMedicaNuse.entity.Usuario;
+import br.com.cs.ClinicaMedicaNuse.repository.MedicoRepository;
 import br.com.cs.ClinicaMedicaNuse.repository.UsuarioRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,10 +16,14 @@ import java.util.List;
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
+    private final MedicoRepository medicoRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
+    public UsuarioService(UsuarioRepository usuarioRepository,
+                          MedicoRepository medicoRepository,
+                          PasswordEncoder passwordEncoder) {
         this.usuarioRepository = usuarioRepository;
+        this.medicoRepository = medicoRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -69,6 +74,12 @@ public class UsuarioService {
                     "Este é o último administrador: cadastre outro antes de mudar o perfil deste");
         }
 
+        // Usuário ligado a um médico precisa continuar com perfil MEDICO.
+        if (request.perfil() != Usuario.Perfil.MEDICO && medicoRepository.existsByUsuarioId(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Este usuário está vinculado a um médico: troque o usuário do médico ou exclua o médico antes de mudar o perfil");
+        }
+
         usuario.setNome(request.nome());
         usuario.setEmail(request.email());
         usuario.setPerfil(request.perfil());
@@ -86,6 +97,11 @@ public class UsuarioService {
                 && usuarioRepository.countByPerfil(Usuario.Perfil.ADMINISTRADOR) <= 1) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Este é o último administrador: o sistema ficaria sem ninguém para cadastrar usuários");
+        }
+
+        if (medicoRepository.existsByUsuarioId(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Este usuário está vinculado a um médico: exclua o médico antes de excluir o usuário");
         }
 
         usuarioRepository.delete(usuario);

@@ -52,7 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
 
                         // O paciente só acessa a própria agenda pelas rotas dedicadas em /auth
-                        .requestMatchers("/auth/minhas-consultas", "/auth/solicitar-agendamento").hasRole("PACIENTE")
+                        .requestMatchers("/auth/minhas-consultas", "/auth/minhas-consultas/*/cancelar", "/auth/meus-atendimentos", "/auth/solicitar-agendamento").hasRole("PACIENTE")
 
                         // Dado clínico: só quem atende. A recepção não lê prontuário nem consulta.
                         .requestMatchers("/consultas/**").hasAnyRole("MEDICO", "ADMINISTRADOR")

@@ -130,6 +130,7 @@
             <!-- Menu reduzido do paciente: só a própria agenda. -->
             <p class="nav-rotulo" data-perfil="PACIENTE">Minha agenda</p>
             <button class="nav-item" data-painel="minhas-consultas" data-perfil="PACIENTE"><span class="nav-icone">≡</span><span>Minhas consultas</span></button>
+            <button class="nav-item" data-painel="meus-atendimentos" data-perfil="PACIENTE"><span class="nav-icone">▢</span><span>Meus atendimentos</span></button>
             <button class="nav-item" data-painel="solicitar-consulta" data-perfil="PACIENTE"><span class="nav-icone">▦</span><span>Solicitar consulta</span></button>
         </nav>
 
@@ -181,12 +182,29 @@
                                 <th>Hora</th>
                                 <th>Médico</th>
                                 <th>Situação</th>
+                                <th class="col-direita">Ações</th>
                             </tr>
                             </thead>
                             <tbody id="tabela-minhas-consultas"></tbody>
                         </table>
                     </div>
                 </div>
+            </section>
+
+            <!-- ================== MEUS ATENDIMENTOS (PACIENTE) =================
+                 O retorno de cada consulta realizada: o que o médico concluiu,
+                 as prescrições e os exames. Não mostra as anotações internas. -->
+            <section class="pagina oculto" id="painel-meus-atendimentos">
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Meus atendimentos</h2>
+                        <span class="selo selo--neutro" id="contador-meus-atendimentos"></span>
+                    </div>
+                    <div class="cartao-corpo">
+                        <p class="dica">Aqui você acompanha como foi cada consulta: o que o médico concluiu, os remédios receitados e os exames pedidos.</p>
+                    </div>
+                </div>
+                <div id="lista-atendimentos"></div>
             </section>
 
             <!-- =================== SOLICITAR CONSULTA (PACIENTE) ==============
@@ -365,6 +383,12 @@
                                     <input class="entrada" id="med-especialidade" name="especialidade" maxlength="80" required autocomplete="off">
                                     <p class="erro-campo oculto"></p>
                                 </div>
+                                <div class="campo">
+                                    <label class="rotulo" for="med-usuario">Usuário (login)</label>
+                                    <select class="entrada entrada--select" id="med-usuario" name="usuarioId" required></select>
+                                    <p class="dica">Só aparecem usuários com perfil Médico ainda sem médico vinculado. Crie o usuário na aba Usuários.</p>
+                                    <p class="erro-campo oculto"></p>
+                                </div>
                             </div>
                             <div class="linha-acoes">
                                 <button type="submit" class="botao botao--primario">Salvar médico</button>
@@ -386,6 +410,7 @@
                                 <th>Nome</th>
                                 <th>CRM</th>
                                 <th>Especialidade</th>
+                                <th data-perfil="ADMINISTRADOR">Usuário</th>
                                 <th class="col-direita">Ações</th>
                             </tr>
                             </thead>
