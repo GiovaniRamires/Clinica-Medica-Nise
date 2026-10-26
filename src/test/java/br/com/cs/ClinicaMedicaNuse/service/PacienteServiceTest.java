@@ -55,7 +55,7 @@ public class PacienteServiceTest {
         when(pacienteRepository.save(any(Paciente.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        Paciente criado = pacienteService.criar(request);
+        Paciente criado = pacienteService.criar(request, true);
 
         assertEquals("Maria Silva", criado.getNome());
         assertEquals("12345678901", criado.getCpf());
@@ -68,7 +68,7 @@ public class PacienteServiceTest {
         when(pacienteRepository.existsByCpf("12345678901")).thenReturn(true);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> pacienteService.criar(request));
+                () -> pacienteService.criar(request, true));
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
         verify(pacienteRepository, never()).save(any());
@@ -121,7 +121,7 @@ public class PacienteServiceTest {
         when(pacienteRepository.save(any(Paciente.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        Paciente atualizado = pacienteService.atualizar(1L, atualizacao);
+        Paciente atualizado = pacienteService.atualizar(1L, atualizacao, true);
 
         assertEquals("Maria Souza", atualizado.getNome());
         assertEquals("Amil", atualizado.getConvenio());
@@ -142,7 +142,7 @@ public class PacienteServiceTest {
         when(pacienteRepository.existsByCpfAndIdNot("99999999999", 1L)).thenReturn(true);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> pacienteService.atualizar(1L, atualizacao));
+                () -> pacienteService.atualizar(1L, atualizacao, true));
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
         verify(pacienteRepository, never()).save(any());
@@ -153,7 +153,7 @@ public class PacienteServiceTest {
         when(pacienteRepository.findById(99L)).thenReturn(Optional.empty());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> pacienteService.atualizar(99L, request));
+                () -> pacienteService.atualizar(99L, request, true));
 
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
         verify(pacienteRepository, never()).save(any());
