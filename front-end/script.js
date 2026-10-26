@@ -36,6 +36,7 @@ let pacientes = [];
 let medicos = [];
 let agendamentos = [];
 let consultas = [];
+let exames = [];
 let usuarios = [];
 
 
@@ -259,6 +260,7 @@ function encerrarSessao(mensagem) {
     medicos = [];
     agendamentos = [];
     consultas = [];
+    exames = [];
     usuarios = [];
 
     document.getElementById('aplicacao').classList.add('oculto');
@@ -312,6 +314,7 @@ async function carregarTudo() {
         await carregarMedicos();
         await carregarAgendamentos();
         if (podeVerDadoClinico()) await carregarConsultas();
+        if (podeVerDadoClinico()) await carregarExames();
         if (ehAdministrador()) await carregarUsuarios();
         renderizarDashboard();
     } catch (erro) {
@@ -914,6 +917,7 @@ function atenderAgendamento(id) {
 async function carregarConsultas() {
     consultas = await requisicao('/consultas');
     mostrarConsultas();
+    atualizarSelectDeConsulta();
 }
 
 function mostrarConsultas() {
@@ -1003,6 +1007,121 @@ function cancelarEdicaoConsulta() {
 
     document.getElementById('titulo-form-consulta').textContent = 'Registrar atendimento';
     document.getElementById('cancelar-consulta').classList.add('oculto');
+}
+
+
+/* ============================== EXAMES ==============================
+ * RF07: solicitar exame a partir de uma consulta.
+ * RF08: cada exame guarda paciente, consulta de origem, nome, data da
+ *       solicitação, situação, data de realização e resultado.
+ * RF09: listar os exames de um paciente (filtro na tabela).
+ * RF10: filtro "Só pendentes" mostra os ainda não realizados.
+ */
+
+async function carregarExames() {
+    const somentePendentes = document.getElementById('filtro-exames-pendentes').checked;
+    exames = await requisicao(somentePendentes ? '/exames?pendentes=true' : '/exames');
+    mostrarExames();
+}
+
+/** Textos dos botões de situação conforme o estado atual do exame. */
+function acoesExame(exame) {
+    let acoes = '';
+    if (exame.situacao === 'SOLICITADO') {
+        acoes += `<button class="botao botao--secundario botao--pequeno" onclick="alterarSituacaoExame(${exame.id}, 'AGENDADO')">Agendar</button>`;
+    }
+    if (exame.situacao === 'SOLICITADO' || exame.situacao === 'AGENDADO') {
+        acoes += `<button class="botao botao--primario botao--pequeno" onclick="registrarResultadoExame(${exame.id})">Registrar resultado</button>
+                  <button class="botao botao--perigo botao--pequeno" onclick="alterarSituacaoExame(${exame.id}, 'CANCELADO')">Cancelar</button>`;
+    }
+    if (exame.situacao === 'REALIZADO' && exame.resultado) {
+        acoes += `<button class="botao botao--secundario botao--pequeno" onclick="verResultadoExame(${exame.id})">Ver resultado</button>`;
+    }
+    return acoes || '—';
+}
+
+function mostrarExames() {
+    document.getElementById('contador-exames').textContent = exames.length;
+    const tabela = document.getElementById('tabela-exames');
+
+    if (exames.length === 0) {
+        tabela.innerHTML = '<tr><td class="vazio" colspan="7">Nenhum exame solicitado.</td></tr>';
+        return;
+    }
+
+    tabela.innerHTML = exames.map(exame => `
+        <tr>
+            <td>${esc(formatarData(exame.dataSolicitacao))}</td>
+            <td>${esc(exame.paciente.nome)}</td>
+            <td>${esc(exame.nome)}</td>
+            <td><span class="selo selo--${esc(exame.situacao)}">${esc(exame.situacao)}</span></td>
+            <td>${esc(formatarData(exame.dataRealizacao))}</td>
+            <td>${exame.resultado ? esc(exame.resultado.length > 40 ? exame.resultado.slice(0, 40) + '…' : exame.resultado) : '—'}</td>
+            <td><div class="acoes-linha">${acoesExame(exame)}</div></td>
+        </tr>
+    `).join('');
+}
+
+/** Monta o select de consultas do formulário de solicitação de exame. */
+function atualizarSelectDeConsulta() {
+    const itens = consultas.map(c => ({
+        valor: c.id,
+        texto: formatarData(c.data) + ' — ' + c.paciente.nome + ' / ' + c.medico.nome
+    }));
+    preencherSelect(document.getElementById('form-exame').elements.consultaId,
+        itens, 'Registre uma consulta primeiro');
+}
+
+async function solicitarExame(evento) {
+    evento.preventDefault();
+    const form = evento.target;
+    limparErros(form);
+    if (!form.reportValidity()) return;
+
+    const dados = lerFormulario(form);
+
+    try {
+        await requisicao('/exames', 'POST', {
+            consultaId: Number(dados.consultaId),
+            nome: dados.nome
+        });
+        mostrarToast('Exame solicitado.', 'ok');
+        form.reset();
+        await carregarExames();
+    } catch (erro) {
+        mostrarErros(form, erro);
+    }
+}
+
+async function alterarSituacaoExame(id, situacao) {
+    try {
+        await requisicao('/exames/' + id + '/situacao', 'PUT', {situacao: situacao});
+        mostrarToast('Exame marcado como ' + situacao + '.', 'ok');
+        await carregarExames();
+    } catch (erro) {
+        mostrarToast(erro.mensagem, 'erro');
+    }
+}
+
+async function registrarResultadoExame(id) {
+    const resultado = prompt('Resultado do exame:');
+    if (resultado === null) return;             // cancelou o prompt
+    if (resultado.trim() === '') {
+        mostrarToast('O resultado não pode ficar em branco.', 'erro');
+        return;
+    }
+    try {
+        await requisicao('/exames/' + id + '/resultado', 'PUT', {resultado: resultado.trim()});
+        mostrarToast('Resultado registrado.', 'ok');
+        await carregarExames();
+    } catch (erro) {
+        mostrarToast(erro.mensagem, 'erro');
+    }
+}
+
+function verResultadoExame(id) {
+    const exame = exames.find(e => e.id === id);
+    if (exame) alert('Resultado de "' + exame.nome + '":\n\n' + exame.resultado);
 }
 
 
@@ -1236,6 +1355,7 @@ async function iniciar() {
     document.getElementById('form-medico').addEventListener('submit', salvarMedico);
     document.getElementById('form-agendamento').addEventListener('submit', salvarAgendamento);
     document.getElementById('form-consulta').addEventListener('submit', salvarConsulta);
+    document.getElementById('form-exame').addEventListener('submit', solicitarExame);
     document.getElementById('form-usuario').addEventListener('submit', salvarUsuario);
     document.getElementById('form-senha').addEventListener('submit', trocarSenha);
     document.getElementById('cancelar-paciente').addEventListener('click', cancelarEdicaoPaciente);
@@ -1245,6 +1365,9 @@ async function iniciar() {
     document.getElementById('select-prontuario').addEventListener('change', evento => {
         if (evento.target.value) mostrarProntuario(Number(evento.target.value));
         else document.getElementById('conteudo-prontuario').innerHTML = '';
+    });
+    document.getElementById('filtro-exames-pendentes').addEventListener('change', () => {
+        carregarExames().catch(erro => mostrarToast(erro.mensagem, 'erro'));
     });
 
     // Se já existe um token nesta aba, confirma com o back-end antes de entrar.
