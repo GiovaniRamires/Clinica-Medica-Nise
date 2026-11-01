@@ -124,6 +124,7 @@
             <button class="nav-item" data-painel="consultas" data-perfil="MEDICO,ADMINISTRADOR"><span class="nav-icone">▣</span><span>Consultas</span></button>
             <button class="nav-item" data-painel="exames" data-perfil="MEDICO,ADMINISTRADOR"><span class="nav-icone">⚗</span><span>Exames</span></button>
             <button class="nav-item" data-painel="prontuario" data-perfil="MEDICO,ADMINISTRADOR"><span class="nav-icone">▢</span><span>Prontuário</span></button>
+            <button class="nav-item" data-painel="relatorios" data-perfil="ADMINISTRADOR,MEDICO,RECEPCIONISTA"><span class="nav-icone">📊</span><span>Relatórios</span></button>
             <p class="nav-rotulo" data-perfil="ADMINISTRADOR">Administração</p>
             <button class="nav-item" data-painel="usuarios" data-perfil="ADMINISTRADOR"><span class="nav-icone">◉</span><span>Usuários</span></button>
 
@@ -288,6 +289,45 @@
                             <p class="dica">Banco vazio? Crie pacientes, médicos e agendamentos fictícios para explorar o sistema.</p>
                         </div>
                         <button class="botao botao--secundario" id="botao-seed" onclick="criarDadosDemonstracao()">✨ Criar dados de demonstração</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================== RELATÓRIOS =========================
+                 Consultas gerenciais (PA-19): indicadores operacionais da
+                 clínica. Sem dados financeiros/faturamento (fora do escopo). -->
+            <section class="pagina oculto" id="painel-relatorios">
+                <div class="cartao">
+                    <div class="cartao-cabecalho">
+                        <h2 class="cartao-titulo">Relatórios gerenciais</h2>
+                        <button class="link-ver-todas" onclick="carregarRelatorios()">Atualizar ↻</button>
+                    </div>
+                    <div class="cartao-corpo">
+                        <p class="dica">Indicadores operacionais da clínica, calculados a partir dos agendamentos, consultas, exames e cadastros.</p>
+                    </div>
+                </div>
+
+                <div class="grade-resumo" id="relatorios-cards"></div>
+
+                <div class="grade-dashboard">
+                    <div class="cartao">
+                        <div class="cartao-cabecalho"><h2 class="cartao-titulo">Agendamentos por situação</h2></div>
+                        <div id="relatorios-agendamentos-situacao"></div>
+                    </div>
+                    <div class="cartao">
+                        <div class="cartao-cabecalho"><h2 class="cartao-titulo">Exames por situação</h2></div>
+                        <div id="relatorios-exames-situacao"></div>
+                    </div>
+                </div>
+
+                <div class="grade-dashboard">
+                    <div class="cartao">
+                        <div class="cartao-cabecalho"><h2 class="cartao-titulo">Consultas realizadas por médico</h2></div>
+                        <div id="relatorios-consultas-medico"></div>
+                    </div>
+                    <div class="cartao">
+                        <div class="cartao-cabecalho"><h2 class="cartao-titulo">Exames mais solicitados</h2></div>
+                        <div id="relatorios-exames-nome"></div>
                     </div>
                 </div>
             </section>

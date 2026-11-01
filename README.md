@@ -6,6 +6,69 @@ O projeto é composto por uma **API REST** em Spring Boot e um **front-end** em 
 
 ---
 
+## Planejamento e metodologia
+
+O desenvolvimento seguiu uma abordagem ágil baseada em sprints, com backlog, tarefas e acompanhamento centralizados no **Jira** (projeto `PA`). Foram **4 sprints** e **20 itens** entregues — 100% concluídos.
+
+| Métrica | Valor |
+|---|---|
+| Sprints | 4 |
+| Itens entregues | 20 (8 histórias + 12 tarefas) |
+| Status geral | ✅ 100% concluído |
+| Líder do projeto | Giovani Ramires |
+
+Princípios aplicados:
+
+- **Planejamento primeiro:** a Sprint 1 fixou requisitos (RF01–RF30), regras de negócio (RN01–RN20), requisitos não funcionais (RNF01–RNF07, incluindo LGPD) e critérios de aceitação antes de qualquer implementação.
+- **Entrega incremental:** cadastros e agendamento (Sprint 2), funcionalidades clínicas e gerenciais (Sprint 3).
+- **Qualidade ao final:** uma sprint inteira dedicada a testes de fluxo, validação de regras, segurança/RNF e correção de bugs.
+- **Rastreabilidade:** cada item mapeado a requisitos e regras específicas (ex.: RN20 na geração de consultas).
+
+### Sprint 1 — Requisitos e Regras
+
+| Chave | Tipo | Item |
+|---|---|---|
+| PA-4 | Tarefa | Definir requisitos funcionais e regras de negócio (RF01–RF30, RN01–RN20) |
+| PA-5 | Tarefa | Definir requisitos não funcionais (RNF01–RNF07, segurança, LGPD) |
+| PA-6 | Tarefa | Modelar entidades e relacionamentos principais |
+| PA-7 | Tarefa | Definir critérios de aceitação do sistema |
+
+### Sprint 2 — Cadastros e Agendamento
+
+| Chave | Tipo | Item |
+|---|---|---|
+| PA-8 | História | Implementar cadastro de pacientes (CPF, convênios, alergias, prontuário) |
+| PA-9 | História | Implementar cadastro de médicos e especialidades |
+| PA-10 | História | Implementar agendamento de consultas |
+| PA-11 | História | Implementar alteração da situação do agendamento |
+| PA-12 | História | Implementar geração de consulta a partir do atendimento (RN20) |
+
+### Sprint 3 — Funcionalidades Complementares
+
+| Chave | Tipo | Item |
+|---|---|---|
+| PA-13 | História | Implementar prontuário e histórico de consultas |
+| PA-14 | História | Implementar solicitação e acompanhamento de exames |
+| PA-15 | História | Implementar prescrições de medicamentos |
+| PA-19 | História | Implementar relatórios e consultas gerenciais |
+
+### Sprint 4 — Testes e Validação
+
+| Chave | Tipo | Item |
+|---|---|---|
+| PA-20 | Tarefa | Testar cadastro e agendamento |
+| PA-21 | Tarefa | Testar consultas, exames e prescrições |
+| PA-22 | Tarefa | Testar procedimentos e relatórios |
+| PA-23 | Tarefa | Validar regras de negócio e integridade dos dados (RN01–RN20) |
+| PA-24 | Tarefa | Executar testes de segurança e requisitos não funcionais |
+| PA-25 | Tarefa | Corrigir bugs encontrados na validação final |
+
+### Equipe
+
+Giovani Ramires (líder), Arthur Oliveira Souza, Arthur Ramires, Nicolas Henrique Ribeiro dos Santos e Pedro Isaque Vieira Pereira.
+
+---
+
 ## Tecnologias
 
 - **Java 21**
@@ -191,6 +254,11 @@ O sistema controla o que cada usuário pode fazer através de perfis:
 | GET | `/usuarios/{id}` | Busca por id |
 | PUT | `/usuarios/{id}` | Atualiza |
 | DELETE | `/usuarios/{id}` | Remove |
+
+### Relatórios — `/relatorios` *(equipe da clínica, não o paciente)*
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/relatorios/gerencial` | Indicadores gerenciais: totais, taxa de comparecimento/faltas, agendamentos e exames por situação, consultas por médico e exames mais solicitados |
 
 ---
 
