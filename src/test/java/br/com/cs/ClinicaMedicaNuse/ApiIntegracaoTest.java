@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Testes de ponta a ponta da API: garantem o contrato dos DTOs (o que entra,
  * o que sai e o que NÃO sai), a validação dos campos e as regras de negócio.
- *
+ * <p>
  * A API passou a exigir autenticação, então o MockMvc desta classe já vai com
  * o token de um ADMINISTRADOR em todas as requisições. Quem testa as permissões
  * por perfil é o SegurancaIntegracaoTest.
@@ -285,7 +285,10 @@ class ApiIntegracaoTest {
                 {"nome":"Dr. House","crm":"abc","especialidade":"Clinico Geral"}
                 """, 400);
 
-        assertThat((String) ler(erro, "$.campos[0].campo")).isEqualTo("crm");
+        // A ordem dos erros de validação não é garantida pela Bean Validation,
+        // então verificamos que o campo "crm" está entre os campos reportados.
+        java.util.List<String> campos = ler(erro, "$.campos[*].campo");
+        assertThat(campos).contains("crm");
     }
 
     @Test
@@ -491,7 +494,7 @@ class ApiIntegracaoTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         java.util.List<Boolean> livre = JsonPath.read(agenda, "$.horarios[?(@.horario=='" + horario + "')].livre");
-        return livre.get(0);
+        return livre.getFirst();
     }
 
     @Test

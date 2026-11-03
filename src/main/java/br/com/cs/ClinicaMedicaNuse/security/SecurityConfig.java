@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -43,7 +44,7 @@ public class SecurityConfig {
                                             JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
         http
                 .cors(Customizer.withDefaults())   // reaproveita o CorsConfig e libera o preflight OPTIONS
-                .csrf(csrf -> csrf.disable())      // API stateless com Bearer token, sem cookie de sessão
+                .csrf(AbstractHttpConfigurer::disable)  // API stateless com Bearer token, sem cookie de sessão
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/login", "/auth/logout", "/auth/cadastro-paciente", "/error").permitAll()
@@ -62,6 +63,9 @@ public class SecurityConfig {
 
                         // Cadastro de usuários do sistema é só do administrador
                         .requestMatchers("/usuarios/**").hasRole("ADMINISTRADOR")
+
+                        // Relatórios/consultas gerenciais: equipe da clínica, nunca o paciente
+                        .requestMatchers("/relatorios/**").hasAnyRole("MEDICO", "RECEPCIONISTA", "ADMINISTRADOR")
 
                         // Excluir paciente apaga histórico: só administrador
                         .requestMatchers(HttpMethod.DELETE, "/pacientes/**").hasRole("ADMINISTRADOR")

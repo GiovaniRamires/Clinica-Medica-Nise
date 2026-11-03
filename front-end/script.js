@@ -212,6 +212,9 @@ function trocarAba(nome) {
         painel.classList.toggle('oculto', painel.id !== 'painel-' + nome);
     });
     document.getElementById('aplicacao').classList.remove('menu-aberto');
+
+    // Relatórios são carregados sob demanda, ao abrir a aba.
+    if (nome === 'relatorios') carregarRelatorios();
 }
 
 
@@ -613,6 +616,75 @@ function renderizarDashboard() {
     // O cartão de demonstração só faz sentido com o banco vazio.
     document.getElementById('cartao-demo').classList.toggle('oculto', pacientes.length > 0 || medicos.length > 0);
 }
+
+
+/* ============================ RELATÓRIOS ============================= */
+/* Consultas gerenciais (PA-19): consome GET /relatorios/gerencial e monta os
+   cards de totais e as listas de contagem. Sem faturamento (fora do escopo). */
+
+/** Tradução dos nomes de situação do enum para rótulos legíveis. */
+const ROTULO_SITUACAO = {
+    SOLICITADO: 'Solicitado', AGENDADO: 'Agendado', CONFIRMADO: 'Confirmado',
+    REALIZADO: 'Realizado', AUSENTE: 'Não compareceu', CANCELADO: 'Cancelado'
+};
+
+async function carregarRelatorios() {
+    try {
+        const r = await requisicao('/relatorios/gerencial');
+
+        const cards = [
+            {rotulo: 'Consultas realizadas', valor: r.totalConsultasRealizadas, sub: 'Atendimentos concluídos', cor: '#16a34a'},
+            {rotulo: 'Agendamentos', valor: r.totalAgendamentos, sub: 'Total registrado', cor: '#1d4ed8'},
+            {rotulo: 'Exames', valor: r.totalExames, sub: 'Total solicitado', cor: '#475569'},
+            {rotulo: 'Faltas', valor: r.totalFaltas, sub: r.taxaFaltas + '% de ausência', cor: '#dc2626'},
+            {rotulo: 'Taxa de comparecimento', valor: r.taxaComparecimento + '%', sub: 'Realizados / (realizados + faltas)', cor: '#16a34a'},
+            {rotulo: 'Pacientes', valor: r.totalPacientes, sub: r.totalMedicos + ' médico(s) ativo(s)', cor: '#475569'}
+        ];
+        document.getElementById('relatorios-cards').innerHTML = cards.map(c => `
+            <div class="card-resumo">
+                <p class="card-resumo-rotulo">${esc(c.rotulo)}</p>
+                <p class="card-resumo-valor" style="color:${c.cor}">${esc(c.valor)}</p>
+                <p class="card-resumo-sub">${esc(c.sub)}</p>
+            </div>
+        `).join('');
+
+        renderizarListaContagem('relatorios-agendamentos-situacao', r.agendamentosPorSituacao,
+            rot => ROTULO_SITUACAO[rot] || rot);
+        renderizarListaContagem('relatorios-exames-situacao', r.examesPorSituacao,
+            rot => ROTULO_SITUACAO[rot] || rot);
+        renderizarListaContagem('relatorios-consultas-medico', r.consultasPorMedico, rot => rot);
+        renderizarListaContagem('relatorios-exames-nome', r.examesMaisSolicitados, rot => rot);
+    } catch (erro) {
+        mostrarToast(erro.mensagem, 'erro');
+    }
+}
+
+/**
+ * Monta uma lista de barras rótulo/quantidade. A barra é proporcional ao maior
+ * valor da lista, dando uma leitura visual rápida sem depender de biblioteca.
+ */
+function renderizarListaContagem(idAlvo, linhas, formatarRotulo) {
+    const alvo = document.getElementById(idAlvo);
+    if (!linhas || linhas.length === 0) {
+        alvo.innerHTML = '<p class="vazio" style="padding:20px 24px">Sem dados para exibir ainda.</p>';
+        return;
+    }
+    const maximo = Math.max(...linhas.map(l => l.quantidade), 1);
+    alvo.innerHTML = linhas.map(l => {
+        const pct = Math.round(l.quantidade * 100 / maximo);
+        return `
+        <div class="item-lista-dashboard">
+            <div style="flex:1">
+                <p class="item-lista-titulo">${esc(formatarRotulo(l.rotulo))}</p>
+                <div style="height:6px;border-radius:4px;background:#e2e8f0;margin-top:6px">
+                    <div style="height:6px;border-radius:4px;width:${pct}%;background:#1d4ed8"></div>
+                </div>
+            </div>
+            <span class="selo selo--neutro" style="margin-left:12px">${esc(l.quantidade)}</span>
+        </div>`;
+    }).join('');
+}
+
 
 /**
  * Cria pacientes, médicos e agendamentos fictícios pela própria API, no
